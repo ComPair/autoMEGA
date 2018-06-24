@@ -60,7 +60,7 @@ bool clean(bool autoClean, string cleanCMD="rm -rf *"){
 
 To redirect stdout and stderr to a file and still view on command line, use `[autoMEGA command & arguments] 2>&1 | tee file.txt`, where `[autoMEGA command & arguments]` is the command and arguments, and `file.txt` is the desired output file.
 
-To compile, use `g++ -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -g -lcurl -lyaml-cpp -Ofast -Wall autoMEGA.cpp -o autoMEGA`
+To compile, use `g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -g -lcurl -lyaml-cpp -Ofast -Wall -o autoMEGA`
 
 TODO:
 Implement cosima iterations

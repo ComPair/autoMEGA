@@ -11,7 +11,7 @@ You will need to recursively initiate git modules to compile.
 
 Depends on yaml-cpp.
 
-The recommended compilation mehtod: `g++ -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall autoMEGA.cpp -o autoMEGA`
+The recommended compilation mehtod: `g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -o autoMEGA`
 
 Go to [Github pages](https://cbray0.github.io/autoMEGA/html/autoMEGA_8h.html) for full documentation.
 

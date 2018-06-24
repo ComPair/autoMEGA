@@ -9,9 +9,9 @@ branches:
 # Environment variables
 env:
   global:
-    - GH_REPO_NAME: pipeliningTools
+    - GH_REPO_NAME: autoMEGA
     - DOXYFILE: $TRAVIS_BUILD_DIR/Doxyfile
-    - GH_REPO_REF: github.com/cbray0/pipeliningTools.git
+    - GH_REPO_REF: github.com/cbray0/autoMEGA.git
 
 # Install dependencies
 addons:
@@ -26,7 +26,11 @@ addons:
 
 # Build your code e.g. by calling make
 script:
+  - git submodule update --init --recursive
+  - cd pipe*
   - g++ -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -g -Ofast -Wall -c pipeline.h
+  - cd ..
+  - g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -g -lcurl -lyaml-cpp -Ofast -Wall -o autoMEGA
 
 # Generate and deploy documentation
 after_success:
