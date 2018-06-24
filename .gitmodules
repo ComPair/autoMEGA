@@ -1,0 +1,3 @@
+[submodule "pipeliningTools"]
+	path = pipeliningTools
+	url = https://github.com/cbray0/pipeliningTools.git
