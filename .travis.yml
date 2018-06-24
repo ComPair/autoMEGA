@@ -23,6 +23,7 @@ addons:
       - doxygen-gui
       - graphviz
       - libdw-dev
+      - libyaml-cpp-dev
 
 # Build your code e.g. by calling make
 script:
