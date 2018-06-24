@@ -35,3 +35,5 @@
 autoMEGA
 config.yaml
 test/
+*.source
+*.geo.setup

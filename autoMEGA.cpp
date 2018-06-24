@@ -144,7 +144,7 @@ int main(int argc,char** argv){
     // TODO: Parse geomega section of config, check each geometry, and multithread
 
     // Geomega section
-    bash("geomega -f "+geoSetup+" | tee geomega.run0.out");
+    bash("geomega -f "+geoSetup+" --check-geometry | tee geomega.run0.out");
     ifstream overlapCheck("geomega.run0.out");
     bool check0=0,check1=0;
     if(overlapCheck.is_open()) for(string line;getline(overlapCheck,line);){
