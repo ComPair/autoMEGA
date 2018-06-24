@@ -6,7 +6,7 @@
 */
 
 #include "pipeliningTools/pipeline.h"
-#include <yaml-cpp/yaml.h>
+#include "yaml-cpp/yaml.h"
 
 using namespace std;
 
@@ -65,7 +65,8 @@ To compile, use `g++ -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -g -lcurl -lyaml
 TODO:
 Implement cosima iterations
 Implement goemetry iterations
-Implement memory watchdog should that become an issue;
+Implement memory watchdog should that become an issue
+Setup automated build testing and documentation building
 
 */
 int main(int argc,char** argv){
@@ -92,6 +93,12 @@ int main(int argc,char** argv){
             if(string(argv[i])=="--max-threads") maxThreads = atoi(argv[++i]);
             if(string(argv[i])=="--test") test = 1;
         }
+    }
+
+    struct stat buffer;
+    if(!(stat (settings.c_str(), &buffer) == 0)){
+        cerr << "File \"" << settings << "\" does not exist, but was requested. Exiting."<< endl;
+        return 1;
     }
 
     YAML::Node config = YAML::LoadFile(settings);
