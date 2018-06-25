@@ -10,20 +10,36 @@
 
 using namespace std;
 
-int test = 0;
-string settings = "config.yaml";// Default values for all arguments
+// Default values for all arguments. Strings cannot be atomic, but they should only be read by threads, so there shouldnt be a problem.
+
+/// Yaml comfig file for the simulation
+string settings = "config.yaml";
+/// Base geometry setup file for the simulations
 string geoSetup = "empty";
+/// Base cosima .source file for the simulations
 string cosimaSource = "empty";
+/// Geomega settings file (defaults to geomega default)
 string geomegaSettings = "~/.geomega.cfg";
+/// Revan settings file (defaults to revan default)
 string revanSettings = "~/.revan.cfg";
+/// Mimrec settings file (defaults to mimrec default)
 string mimrecSettings = "~/.mimrec.cfg";
-string hook = "https://example.com";
-string address = "example@example.com";
+/// Slack hook (if empty, slack notifications are disabled)
+string hook = "";
+/// Email address for notifications (if empty, email notifications are disabled)
+string address = "";
+/// Maximum threads to use for simulations
 int maxThreads = (std::thread::hardware_concurrency()==0)?4:std::thread::hardware_concurrency(); // If it cannot detect the number of threads, default to 4
+/// Command used to clean the active directory (if called by the directory checker)
 string cleanCMD="rm -rf *";
+/// File to which simulation settings are logged
 ofstream legend;
+/// Mutex to make sure only one thing is writing to legend at a time
 mutex legendLock;
+/// Current thread count
 atomic<int> currentThreadCount(0);
+/// Int to indicate test level (0=real run, otherwise it disables some exiting or notification features)
+atomic<int> test(0);
 
 /**
  @brief Clean the current directory
@@ -328,8 +344,8 @@ int main(int argc,char** argv){
     auto end = chrono::steady_clock::now();
     cout << endl << "Total simulation and analysis elapsed time: " << beautify_duration(chrono::duration_cast<chrono::seconds>(end-start)) << endl;
     if(!test){
-        slack("Simulation complete",hook);
-        email(address,"Simulation Complete");
+        if(!hook.empty()) slack("Simulation complete",hook);
+        if(!address.empty() email(address,"Simulation Complete");
     }
     return 0;
 }
