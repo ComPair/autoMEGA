@@ -114,7 +114,7 @@ void parseOptionsFromDoubleVector(const vector<vector<T>> &values, vector<vector
  Incomplete
 
 */
-void runSimulation(const int threadNumber, const string beamType, const vector<double> &beamOptions, const string &spectrumType, const vector<double> &spectrumOptions){
+void runSimulation(const int threadNumber, const string beamType, const vector<double> &beamOptions, const string &spectrumType, const vector<double> &spectrumOptions, const double &flux, const string &polarizationType, const vector<double> &polarizationOptions){
     // Create legend
     legendLock.lock();
     legend << "Run number " << threadNumber << ":" << endl;
@@ -122,6 +122,9 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
     for(size_t i=0;i<beamOptions.size();i++) legend << beamOptions[i] << " ";
     legend << endl << "Spectrum: " << spectrumType << " ";
     for(size_t i=0;i<spectrumOptions.size();i++) legend << spectrumOptions[i] << " ";
+    legend << endl << "Flux: " << flux << endl;
+    legend << "Polarization: " << polarizationType << " ";
+    for(size_t i=0;i<polarizationOptions.size();i++) legend << polarizationOptions[i] << " ";
     legend << endl << endl;
     legendLock.unlock();
 
@@ -197,7 +200,6 @@ int main(int argc,char** argv){
         return 1;
     }
 
-    cout << settings << endl;
     YAML::Node config = YAML::LoadFile(settings);
     if(config["geomegaSettings"]) geomegaSettings = config["geomegaSettings"].as<string>();
     if(config["revanSettings"]) revanSettings = config["revanSettings"].as<string>();
@@ -254,7 +256,6 @@ int main(int argc,char** argv){
     // End geomega section
 
     // Generate list of simulations
-    // TODO: Add options for manipulating flux and polarization
 
     vector<string> beamType;
     vector<vector<double>> beam;
@@ -280,10 +281,25 @@ int main(int argc,char** argv){
             spectrum.push_back(tempValues);
         }
     }
+    vector<double> flux;
+    if(config["cosima"]["flux"]) parseIterativeNode(config["cosima"]["flux"],flux);
+    vector<string> polarizationType;
+    vector<vector<double>> polarization;
+    if(config["cosima"]["polarization"]){
+        // First parameter is a string for the type. Use another list to iterate over.
+        for(size_t i=0;i<config["cosima"]["polarization"][0].size();i++) polarizationType.push_back(config["cosima"]["polarization"][0][i].as<string>());
+        // The rest of the parameters are for options for the spectrum
+        for(size_t i=1;i<config["cosima"]["polarization"].size();i++){
+            vector<double> tempValues;
+            parseIterativeNode<double>(config["cosima"]["polarization"][i],tempValues);
+            polarization.push_back(tempValues);
+        }
+    }
 
-    int totalSims = beamType.size()*spectrumType.size();
+    int totalSims = beamType.size()*spectrumType.size()*flux.size()*polarizationType.size();
     for(size_t i=0;i<beam.size();i++) totalSims*=beam[i].size();
     for(size_t i=0;i<spectrum.size();i++) totalSims*=spectrum[i].size();
+    for(size_t i=0;i<polarization.size();i++) totalSims*=polarization[i].size();
     cout << totalSims << endl;
     // TODO: Iterate over more things in cosima.
 
@@ -296,9 +312,17 @@ int main(int argc,char** argv){
                 vector<vector<double>> spectrumOptions;
                 parseOptionsFromDoubleVector(spectrum,spectrumOptions);
                 for(size_t l=0;l<spectrumOptions.size();l++){
-                    while(currentThreadCount>maxThreads)sleep(0.1);
-                    threadpool.push_back(thread(runSimulation,threadpool.size(),beamType[i], beamOptions[k], spectrumType[j], spectrumOptions[l]));
-                    currentThreadCount++;
+                    for(size_t m=0;m<flux.size();m++){
+                        for(size_t n=0;n<polarizationType.size();n++){
+                            vector<vector<double>> polarizationOptions;
+                            parseOptionsFromDoubleVector(polarization,polarizationOptions);
+                            for(int o=0;o<polarizationOptions.size();o++){
+                                while(currentThreadCount>maxThreads)sleep(0.1);
+                                threadpool.push_back(thread(runSimulation,threadpool.size(),beamType[i], beamOptions[k], spectrumType[j], spectrumOptions[l], flux[m], polarizationType[n],polarizationOptions[o]));
+                                currentThreadCount++;
+                            }
+                        }
+                    }
                 }
             }
         }
