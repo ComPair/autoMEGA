@@ -10,7 +10,7 @@
 
 using namespace std;
 
-string hook,address;
+int test = 0;
 
 /**
  @brief Clean the current directory
@@ -36,6 +36,32 @@ bool clean(bool autoClean, string cleanCMD="rm -rf *"){
     return i;
 }
 
+/**
+ @brief Parse iteraative nodes in list or pattern mode
+
+ ## Parse iterative nodes
+
+ ### Arguments
+ * `YAML::NODE config` - Node to parse
+
+ * `vector<T> &values` - Vector in wich to put all parsed values
+
+ ### Notes
+ There are two distinct parsing modes. If there are exactly three elements in the list, then it assumes it is in the format [first value, last value, step size]. If there is exactly one element, it is assumed it is a list of all values to use.
+*/
+template<typename T>
+void parseIterativeNode(YAML::Node config, vector<T> &values){
+    if(test) cout << config << endl;
+    if(config.size()==3){
+        for(T i=config[0].as<T>();i<config[1].as<T>();i+=config[2].as<T>()) values.push_back(i);
+    } else for(int i=0;i<config[0].size();i++) {
+        values.push_back(config[0][i].as<T>());
+    }
+    if(test){
+        for(T t : values) cout << t << ",";
+        cout << endl;
+    }
+}
 
 /**
 ## autoMEGA
@@ -77,22 +103,23 @@ int main(int argc,char** argv){
     string geomegaSettings = "~/.geomega.cfg";
     string revanSettings = "~/.revan.cfg";
     string mimrecSettings = "~/.mimrec.cfg";
+    string hook = "https://example.com";
+    string address = "example@example.com";
     int maxThreads = (std::thread::hardware_concurrency()==0)?4:std::thread::hardware_concurrency(); // If it cannot detect the number of threads, default to 4
     cout << "Using " << maxThreads << " threads." << endl;
     string cleanCMD="rm -rf *";
-    int test = 0;
 
     for(int i=0;i<argc;i++){ // Assign arguments to values
         if(i<argc-1){
             if(string(argv[i])=="--settings") settings = argv[++i];
-            if(string(argv[i])=="--geoSetup") geoSetup = argv[++i];
-            if(string(argv[i])=="--source") cosimaSource = argv[++i];
-            if(string(argv[i])=="--geomega-settings") geomegaSettings = argv[++i];
-            if(string(argv[i])=="--revan-settings") revanSettings = argv[++i];
-            if(string(argv[i])=="--mimrec-settings") mimrecSettings = argv[++i];
-            if(string(argv[i])=="--max-threads") maxThreads = atoi(argv[++i]);
-            if(string(argv[i])=="--test") test = 1;
+            else if(string(argv[i])=="--geoSetup") geoSetup = argv[++i];
+            else if(string(argv[i])=="--source") cosimaSource = argv[++i];
+            else if(string(argv[i])=="--geomega-settings") geomegaSettings = argv[++i];
+            else if(string(argv[i])=="--revan-settings") revanSettings = argv[++i];
+            else if(string(argv[i])=="--mimrec-settings") mimrecSettings = argv[++i];
+            else if(string(argv[i])=="--max-threads") maxThreads = atoi(argv[++i]);
         }
+        if(string(argv[i])=="--test") test = 1;
     }
 
     struct stat buffer;
@@ -101,23 +128,16 @@ int main(int argc,char** argv){
         return 1;
     }
 
+    cout << settings << endl;
     YAML::Node config = YAML::LoadFile(settings);
     if(config["geomegaSettings"]) geomegaSettings = config["geomegaSettings"].as<string>();
     if(config["revanSettings"]) revanSettings = config["revanSettings"].as<string>();
     if(config["mimrecSettings"]) mimrecSettings = config["mimrecSettings"].as<string>();
     if(config["geoSetup"]) geoSetup = config["geoSetup"].as<string>();
-    if(config["cosimaSource"]) cosimaSource = config["cosimaSource"].as<string>();
+    if(config["cosima"]["source"]) cosimaSource = config["cosima"]["source"].as<string>();
     if(config["threads"]) maxThreads = config["threads"].as<int>();
     if(config["address"]) address = config["address"].as<string>();
-    else{
-        address = "example@example.com";
-        cerr << "Could not find address, assuming dummy address." << endl;
-    }
     if(config["hook"]) hook = config["hook"].as<string>();
-    else{
-        hook = "https://example.com";
-        cerr << "Could not find hook, assuming dummy address." << endl;
-    }
 
     if(geoSetup=="empty") {cout << "Geometry setup required. Exiting." << endl;return 1;}
     if(cosimaSource=="empty") {cout << "Cosima source required. Exiting." << endl;return 1;}
@@ -168,10 +188,39 @@ int main(int argc,char** argv){
     // End geomega section
 
     // Generate list of simulations
-    // vector<string>
-    // if(config["cosimaBeam"]){
+    // Innermost vectors are for each possibility, any outer vectors are for having multiple iterations
 
-    // }
+    vector<string> beamType;
+    vector<vector<double>> beam;
+    if(config["cosima"]["beam"]){
+        // First parameter is a string for the type. Use another list to iterate over.
+        for(int i=0;i<config["cosima"]["beam"][0].size();i++) beamType.push_back(config["cosima"]["beam"][0][i].as<string>());
+        // The rest of the parameters are for options for the beam type. Make sure that they are valid with the cosima manual. If there are three arguments, I will assume they are in the format [initial value, final value, delta value], if there is only one, I will assume it is a nested list of values to iterate over
+        for(int i=1;i<config["cosima"]["beam"].size();i++){
+            vector<double> tempValues;
+            parseIterativeNode<double>(config["cosima"]["beam"][i],tempValues);
+            beam.push_back(tempValues);
+        }
+    }
+    vector<string> spectrumType;
+    vector<vector<double>> spectrum;
+    if(config["cosima"]["spectrum"]){
+        // First parameter is a string for the type. Use another list to iterate over.
+        for(int i=0;i<config["cosima"]["spectrum"][0].size();i++) spectrumType.push_back(config["cosima"]["spectrum"][0][i].as<string>());
+        // The rest of the parameters are for options for the spectrum
+        for(int i=1;i<config["cosima"]["spectrum"].size();i++){
+            vector<double> tempValues;
+            parseIterativeNode<double>(config["cosima"]["spectrum"][i],tempValues);
+            spectrum.push_back(tempValues);
+        }
+    }
+
+    int totalSims = beamType.size()*spectrumType.size();
+    for(int i=0;i<beam.size();i++) totalSims*=beam[i].size();
+    for(int i=0;i<spectrum.size();i++) totalSims*=spectrum[i].size();
+    cout << totalSims << endl;
+    // TODO: Iterate over more things in cosima.
+
 
     // (need to figure out what order I will do stuff in, but multithread this with maxthreads)
     // For each geometry, run all of the cosima things. (requires temp cosima sources, generating seeds, renaming outputs)
