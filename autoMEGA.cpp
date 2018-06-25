@@ -7,6 +7,7 @@
 
 #include "pipeliningTools/pipeline.h"
 #include "yaml-cpp/yaml.h"
+#include <regex>
 
 using namespace std;
 
@@ -135,6 +136,47 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
     }
     legend << endl << endl;
     legendLock.unlock();
+
+    ifstream originalSource(cosimaSource);
+    ofstream newSource("run"+to_string(threadNumber)+".source");
+
+    string run;
+    string source;
+
+    for(string line;getline(originalSource,line);){
+        stringstream ss(line);
+        string command; ss >> command;
+        if(command=="Run") ss >> run;
+        if(command==run+".FileName"){
+            newSource << run+".FileName run"+to_string(threadNumber)<<endl;
+            continue;
+        }
+        if(command==run+".Source") ss >> source;
+        if(beamType!="unchanged" && command==source+".Beam"){
+            newSource << source+".Beam "+beamType+" ";
+            for(auto b : beamOptions) newSource << b << " ";
+            newSource << endl;
+            continue;
+        }
+        if(spectrumType!="unchanged" && command==source+".Spectrum"){
+            newSource << source+".Spectrum "+spectrumType+" ";
+            for(auto s : spectrumOptions) newSource << s << " ";
+            newSource << endl;
+            continue;
+        }
+        if(flux!=-1 && command==source+".Flux"){
+            newSource << source+".Flux "+to_string(flux) << endl;
+            continue;
+        }
+        if(polarizationType!="unchanged" && command==source+".Polarization"){
+            newSource << source+".Polarization "+polarizationType+" ";
+            newSource << setprecision(2);
+            for(auto p : polarizationOptions) newSource << p << " ";
+            newSource << endl;
+            continue;
+        }
+        newSource << line << endl;
+    }
 
     // TODO: Create new cosima .source file (with run number)
         // TODO: Modify save filename (with run number)
