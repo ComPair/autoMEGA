@@ -13,6 +13,6 @@ Depends on yaml-cpp.
 
 The recommended compilation mehtod: `g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -o autoMEGA`
 
-Go to [Github pages](https://cbray0.github.io/autoMEGA/html/autoMEGA_8h.html) for full documentation.
+Go to [Github pages](https://cbray0.github.io/autoMEGA/html/autoMEGA_8cpp.html) for full documentation.
 
 [![Build Status](https://travis-ci.org/cbray0/autoMEGA.svg?branch=master)](https://travis-ci.org/cbray0/autoMEGA)
