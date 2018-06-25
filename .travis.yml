@@ -23,6 +23,9 @@ addons:
       - doxygen-gui
       - graphviz
       - libdw-dev
+      - libxtst-dev
+      - libelf-dev
+      - libcurl4-gnutls-dev
       - libboost-dev
       - libyaml-cpp-dev
 
