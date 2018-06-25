@@ -118,20 +118,26 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
     // Create legend
     legendLock.lock();
     legend << "Run number " << threadNumber << ":" << endl;
-    legend << "Beam: " << beamType << " ";
-    for(size_t i=0;i<beamOptions.size();i++) legend << beamOptions[i] << " ";
-    legend << endl << "Spectrum: " << spectrumType << " ";
-    for(size_t i=0;i<spectrumOptions.size();i++) legend << spectrumOptions[i] << " ";
-    legend << endl << "Flux: " << flux << endl;
-    legend << "Polarization: " << polarizationType << " ";
-    for(size_t i=0;i<polarizationOptions.size();i++) legend << polarizationOptions[i] << " ";
+    if(beamType!="unchanged"){
+        legend << "Beam: " << beamType << " ";
+        for(size_t i=0;i<beamOptions.size();i++) legend << beamOptions[i] << " ";
+    }
+    if(spectrumType!="unchanged"){
+        legend << endl << "Spectrum: " << spectrumType << " ";
+        for(size_t i=0;i<spectrumOptions.size();i++) legend << spectrumOptions[i] << " ";
+    }
+    if(flux!=-1) legend << endl << "Flux: " << flux << endl;
+    if(polarizationType!="unchanged"){
+        legend << "Polarization: " << polarizationType << " ";
+        for(size_t i=0;i<polarizationOptions.size();i++) legend << polarizationOptions[i] << " ";
+    }
     legend << endl << endl;
     legendLock.unlock();
 
     // Create new cosima .source file (with run number)
         // Modify save filename
         // Parse run object and source object name
-        // Replace beam and spectrum lines
+        // If they are to be changed, update beam, spectrum, flux, and polarization lines
     // Run cosima (+random seed), log (with run number)
     // Run revan, log (with run number)
     // Run mimrec, log (with run number)
@@ -268,6 +274,10 @@ int main(int argc,char** argv){
             parseIterativeNode<double>(config["cosima"]["beam"][i],tempValues);
             beam.push_back(tempValues);
         }
+    } else {
+        beamType.push_back("unchanged");
+        vector<double> temp(1,0);
+        beam.push_back(temp);
     }
     vector<string> spectrumType;
     vector<vector<double>> spectrum;
@@ -280,9 +290,14 @@ int main(int argc,char** argv){
             parseIterativeNode<double>(config["cosima"]["spectrum"][i],tempValues);
             spectrum.push_back(tempValues);
         }
+    } else {
+        spectrumType.push_back("unchanged");
+        vector<double> temp(1,0);
+        spectrum.push_back(temp);
     }
     vector<double> flux;
     if(config["cosima"]["flux"]) parseIterativeNode(config["cosima"]["flux"],flux);
+    else flux.push_back(-1);
     vector<string> polarizationType;
     vector<vector<double>> polarization;
     if(config["cosima"]["polarization"]){
@@ -294,6 +309,10 @@ int main(int argc,char** argv){
             parseIterativeNode<double>(config["cosima"]["polarization"][i],tempValues);
             polarization.push_back(tempValues);
         }
+    } else{
+        polarizationType.push_back("unchanged");
+        vector<double> temp(1,0);
+        polarization.push_back(temp);
     }
 
     int totalSims = beamType.size()*spectrumType.size()*flux.size()*polarizationType.size();
@@ -316,7 +335,7 @@ int main(int argc,char** argv){
                         for(size_t n=0;n<polarizationType.size();n++){
                             vector<vector<double>> polarizationOptions;
                             parseOptionsFromDoubleVector(polarization,polarizationOptions);
-                            for(int o=0;o<polarizationOptions.size();o++){
+                            for(size_t o=0;o<polarizationOptions.size();o++){
                                 while(currentThreadCount>maxThreads)sleep(0.1);
                                 threadpool.push_back(thread(runSimulation,threadpool.size(),beamType[i], beamOptions[k], spectrumType[j], spectrumOptions[l], flux[m], polarizationType[n],polarizationOptions[o]));
                                 currentThreadCount++;
