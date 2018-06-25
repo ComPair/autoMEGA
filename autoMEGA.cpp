@@ -160,7 +160,7 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
     // Run mimrec, log (with run number)
 
     currentThreadCount--;
-    // slack("Run "+to_string(threadNumber)+" complete.", hook);
+    if(!test && !hook.empty()) slack("Run "+to_string(threadNumber)+" complete.", hook);
     return;
 }
 
@@ -345,7 +345,7 @@ int main(int argc,char** argv){
     cout << endl << "Total simulation and analysis elapsed time: " << beautify_duration(chrono::duration_cast<chrono::seconds>(end-start)) << endl;
     if(!test){
         if(!hook.empty()) slack("Simulation complete",hook);
-        if(!address.empty() email(address,"Simulation Complete");
+        if(!address.empty()) email(address,"Simulation Complete");
     }
     return 0;
 }
