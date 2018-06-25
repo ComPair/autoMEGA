@@ -11,6 +11,19 @@
 using namespace std;
 
 int test = 0;
+string settings = "config.yaml";// Default values for all arguments
+string geoSetup = "empty";
+string cosimaSource = "empty";
+string geomegaSettings = "~/.geomega.cfg";
+string revanSettings = "~/.revan.cfg";
+string mimrecSettings = "~/.mimrec.cfg";
+string hook = "https://example.com";
+string address = "example@example.com";
+int maxThreads = (std::thread::hardware_concurrency()==0)?4:std::thread::hardware_concurrency(); // If it cannot detect the number of threads, default to 4
+string cleanCMD="rm -rf *";
+ofstream legend;
+mutex legendLock;
+atomic<int> currentThreadCount(0);
 
 /**
  @brief Clean the current directory
@@ -68,21 +81,22 @@ void parseIterativeNode(YAML::Node config, vector<T> &values){
 
  ## Parse vectors of parameter's options to create vectors of options's parameters
 
- The input is a double vector where the inner list is a list of options for the ith parameter and the outer list is the list of parameters, and create a double vector where the inner list is a list of parameters, and the outer list is of each option.
+ The input is a double vector where the inner list is a list of options for the ith parameter and the outer list is the list of parameters. The function creates a double vector where the inner list is a list of parameters, and the outer list is of each option.
 
  ### Arguments
  * `const vector<vector<T>> &values` - Vector to parse
 
  * `vector<vector<T>> &results` - Vector in wich to put all parsed values
+
 */
 template<typename T>
 void parseOptionsFromDoubleVector(const vector<vector<T>> &values, vector<vector<T>> &results){
     vector<T> option(values.size(),0);
-    vector<size_t> positions(values.size(),0);
+    vector<size_t> positions(values.size(),0); // Initialize vectors
     int i=positions.size()-1;
     for(size_t j=0;j<option.size();j++) option[j]=values[j][positions[j]];
-    results.push_back(option);
-    while(i>=0){
+    results.push_back(option); // Push first option
+    while(i>=0){ // Treat like odometer, the LSB counts up, rolls over, then moves to the next one. When the whole thing rolls over, then its done.
         if(positions[i]<values[i].size()){
             option[i]=values[i][positions[i]];
             positions[i]++;
@@ -94,8 +108,44 @@ void parseOptionsFromDoubleVector(const vector<vector<T>> &values, vector<vector
             i--;
         }
     }
-    sort( results.begin(), results.end() );
+    sort( results.begin(), results.end() ); // Remove duplicates
     results.erase( unique( results.begin(), results.end() ), results.end() );
+}
+
+/**
+ @brief Run one simulation and analysis (cosima, revan, mimrec) (incomplete)
+
+ ## Run one simulation and analysis (cosima, revan, mimrec) (incomplete)
+
+ ### Arguments
+ Incomplete
+
+ ### Notes
+ Incomplete
+
+*/
+void runSimulation(const int threadNumber, const string beamType, const vector<double> &beamOptions, const string &spectrumType, const vector<double> &spectrumOptions){
+    // Create legend
+    legendLock.lock();
+    legend << "Run number " << threadNumber << ":" << endl;
+    legend << "Beam: " << beamType << " ";
+    for(size_t i=0;i<beamOptions.size();i++) legend << beamOptions[i] << " ";
+    legend << endl << "Spectrum: " << spectrumType << " ";
+    for(size_t i=0;i<spectrumOptions.size();i++) legend << spectrumOptions[i] << " ";
+    legend << endl << endl;
+    legendLock.unlock();
+
+    // Create new cosima .source file (with run number)
+        // Modify save filename
+        // Parse run object and source object name
+        // Replace beam and spectrum lines
+    // Run cosima, log (with run number)
+    // Run revan, log (with run number)
+    // Run mimrec, log (with run number)
+
+    currentThreadCount--;
+    // slack("Run "+to_string(threadNumber)+" complete.", hook);
+    return;
 }
 
 /**
@@ -132,17 +182,6 @@ Setup automated build testing and documentation building
 */
 int main(int argc,char** argv){
     auto start = chrono::steady_clock::now();
-    string settings = "config.yaml";// Default values for all arguments
-    string geoSetup = "empty";
-    string cosimaSource = "empty";
-    string geomegaSettings = "~/.geomega.cfg";
-    string revanSettings = "~/.revan.cfg";
-    string mimrecSettings = "~/.mimrec.cfg";
-    string hook = "https://example.com";
-    string address = "example@example.com";
-    int maxThreads = (std::thread::hardware_concurrency()==0)?4:std::thread::hardware_concurrency(); // If it cannot detect the number of threads, default to 4
-    cout << "Using " << maxThreads << " threads." << endl;
-    string cleanCMD="rm -rf *";
 
     for(int i=0;i<argc;i++){ // Assign arguments to values
         if(i<argc-1){
@@ -156,6 +195,8 @@ int main(int argc,char** argv){
         }
         if(string(argv[i])=="--test") test = 1;
     }
+
+    cout << "Using " << maxThreads << " threads." << endl;
 
     struct stat buffer;
     if(!(stat (settings.c_str(), &buffer) == 0)){
@@ -194,7 +235,6 @@ int main(int argc,char** argv){
 
     // Create threadpool
     vector<thread> threadpool;
-    int currentThreadCount = 0;
 
     // TODO: Parse geomega section of config, check each geometry, and multithread
 
@@ -256,8 +296,7 @@ int main(int argc,char** argv){
     cout << totalSims << endl;
     // TODO: Iterate over more things in cosima.
 
-    ofstream legend("run.legend");
-    mutex legendLock;
+    legend.open("run.legend");
     for(size_t i=0;i<beamType.size();i++){
         for(size_t j=0;j<spectrumType.size();j++){
             vector<vector<double>> beamOptions;
@@ -266,18 +305,14 @@ int main(int argc,char** argv){
                 vector<vector<double>> spectrumOptions;
                 parseOptionsFromDoubleVector(spectrum,spectrumOptions);
                 for(size_t l=0;l<spectrumOptions.size();l++){
-                    legendLock.lock();
-                    legend << "Run number " << currentThreadCount++ << ":" << endl;
-                    legend << "Beam: " << beamType[i] << " ";
-                    for(size_t m=0;m<beamOptions[k].size();m++) legend << beamOptions[k][m] << " ";
-                    legend << endl << "Spectrum: " << spectrumType[j] << " ";
-                    for(size_t m=0;m<spectrumOptions[l].size();m++) legend << spectrumOptions[l][m] << " ";
-                    legend << endl << endl;
-                    legendLock.unlock();
+                    while(currentThreadCount>maxThreads)sleep(0.1);
+                    threadpool.push_back(thread(runSimulation,threadpool.size(),beamType[i], beamOptions[k], spectrumType[j], spectrumOptions[l]));
+                    currentThreadCount++;
                 }
             }
         }
     }
+    for(size_t i=0;i<threadpool.size();i++)threadpool[i].join();
 
 
     // (need to figure out what order I will do stuff in, but multithread this with maxthreads)
