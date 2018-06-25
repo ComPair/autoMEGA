@@ -83,9 +83,10 @@ template<typename T>
 void parseOptionsFromDoubleVector(const vector<vector<T>> &values, vector<vector<T>> &results){
     vector<T> option(values.size(),0);
     vector<size_t> positions(values.size(),0); // Initialize vectors
-    int i=positions.size()-1;
     for(size_t j=0;j<option.size();j++) option[j]=values[j][positions[j]];
     results.push_back(option); // Push first option
+
+    int i=positions.size()-1;
     while(i>=0){ // Treat like odometer, the LSB counts up, rolls over, then moves to the next one. When the whole thing rolls over, then its done.
         if(positions[i]<values[i].size()){
             option[i]=values[i][positions[i]];
@@ -98,6 +99,7 @@ void parseOptionsFromDoubleVector(const vector<vector<T>> &values, vector<vector
             i--;
         }
     }
+
     sort( results.begin(), results.end() ); // Remove duplicates
     results.erase( unique( results.begin(), results.end() ), results.end() );
 }
@@ -134,14 +136,16 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
     legend << endl << endl;
     legendLock.unlock();
 
-    // Create new cosima .source file (with run number)
-        // Modify save filename
-        // Parse run object and source object name
-        // If they are to be changed, update beam, spectrum, flux, and polarization lines
-    // Run cosima (+random seed), log (with run number)
-    // Run revan, log (with run number)
-    // Run mimrec, log (with run number)
+    // TODO: Create new cosima .source file (with run number)
+        // TODO: Modify save filename (with run number)
+        // TODO: Parse run object and source object name
+        // TODO: If they are to be changed, update beam, spectrum, flux, and polarization lines
+    // TODO: Run cosima (+random seed), log (with run number)
+    // TODO: Extract event ratio from log
+    // TODO: Run revan, log (with run number)
+    // TODO: Run mimrec, log (with run number)
 
+    // Cleanup and exit
     currentThreadCount--;
     if(!test && !hook.empty()) slack("Run "+to_string(threadNumber)+" complete.", hook);
     return;
@@ -185,7 +189,8 @@ Setup automated build testing and documentation building
 int main(int argc,char** argv){
     auto start = chrono::steady_clock::now();
 
-    for(int i=0;i<argc;i++){ // Assign arguments to values
+    // Parse command line arguments
+    for(int i=0;i<argc;i++){
         if(i<argc-1){
             if(string(argv[i])=="--settings") settings = argv[++i];
             else if(string(argv[i])=="--geoSetup") geoSetup = argv[++i];
@@ -200,12 +205,14 @@ int main(int argc,char** argv){
 
     cout << "Using " << maxThreads << " threads." << endl;
 
+    // Make sure config file exists
     struct stat buffer;
     if(!(stat (settings.c_str(), &buffer) == 0)){
         cerr << "File \"" << settings << "\" does not exist, but was requested. Exiting."<< endl;
         return 1;
     }
 
+    // Parse config file
     YAML::Node config = YAML::LoadFile(settings);
     if(config["geomegaSettings"]) geomegaSettings = config["geomegaSettings"].as<string>();
     if(config["revanSettings"]) revanSettings = config["revanSettings"].as<string>();
@@ -216,9 +223,11 @@ int main(int argc,char** argv){
     if(config["address"]) address = config["address"].as<string>();
     if(config["hook"]) hook = config["hook"].as<string>();
 
+    // Make sure required files were given
     if(geoSetup=="empty") {cout << "Geometry setup required. Exiting." << endl;return 1;}
     if(cosimaSource=="empty") {cout << "Cosima source required. Exiting." << endl;return 1;}
 
+    // Make sure the rest of the files exist
     vector<string> files = {settings,geoSetup,cosimaSource,geomegaSettings,revanSettings,mimrecSettings};
     for(auto& s : files){
         struct stat buffer;
@@ -261,8 +270,7 @@ int main(int argc,char** argv){
     }
     // End geomega section
 
-    // Generate list of simulations
-
+    // Parse cosima inputs
     vector<string> beamType;
     vector<vector<double>> beam;
     if(config["cosima"]["beam"]){
@@ -315,13 +323,14 @@ int main(int argc,char** argv){
         polarization.push_back(temp);
     }
 
+    // Calculate total number of simulations
     int totalSims = beamType.size()*spectrumType.size()*flux.size()*polarizationType.size();
     for(size_t i=0;i<beam.size();i++) totalSims*=beam[i].size();
     for(size_t i=0;i<spectrum.size();i++) totalSims*=spectrum[i].size();
     for(size_t i=0;i<polarization.size();i++) totalSims*=polarization[i].size();
     cout << totalSims << endl;
-    // TODO: Iterate over more things in cosima.
 
+    // Start all simulation threads.
     legend.open("run.legend");
     for(size_t i=0;i<beamType.size();i++){
         for(size_t j=0;j<spectrumType.size();j++){
@@ -346,17 +355,10 @@ int main(int argc,char** argv){
             }
         }
     }
+    // Join simulation threads
     for(size_t i=0;i<threadpool.size();i++)threadpool[i].join();
 
-
-    // (need to figure out what order I will do stuff in, but multithread this with maxthreads)
-    // For each geometry, run all of the cosima things. (requires temp cosima sources, generating seeds, renaming outputs)
-        // Generate seed
-        // Modify filename
-        // Parse and modify beam
-    // For each of the resulting .sim files, run revan
-    // For each .tra file, run mimrec things on them according to config
-    // Gather data from each simulation output and use it to make a plot of something
+    // TODO: Gather data from each simulation output and use it to make a plot of something
 
     // End timer, print command duration
     auto end = chrono::steady_clock::now();
