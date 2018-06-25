@@ -30,8 +30,6 @@ string hook = "";
 string address = "";
 /// Maximum threads to use for simulations
 int maxThreads = (std::thread::hardware_concurrency()==0)?4:std::thread::hardware_concurrency(); // If it cannot detect the number of threads, default to 4
-/// Command used to clean the active directory (if called by the directory checker)
-string cleanCMD="rm -rf *";
 /// File to which simulation settings are logged
 ofstream legend;
 /// Mutex to make sure only one thing is writing to legend at a time
@@ -40,30 +38,6 @@ mutex legendLock;
 atomic<int> currentThreadCount(0);
 /// Int to indicate test level (0=real run, otherwise it disables some exiting or notification features)
 atomic<int> test(0);
-
-/**
- @brief Clean the current directory
-
- ## Clean the current directory
-
- ### Arguments:
- * `bool autoClean` - Bool of whether or not to automatically clean the directory. It defualts to zero, which will prompt the user first, but if set to one the program cleans the directory without outside input.
-
- * `string cleanCMD` - Sh (bourne shell) command used to clean directory. Defaults to `rm -f *.root`.
-
- ### Notes:
- Ensures there are no files matching g4out*.root in the current directory. If there are, it offers to automatically remove them, or to exit the program to allow the user to save and remove them manually.
- Also note that this assumes that all output files end in `.root`, and no other files end in `.root`. If you want to preserve these files, you should move them to a differnt directory or change their filename (as an example, `g4out.root`->`g4out.root.keep`).
-*/
-bool clean(bool autoClean, string cleanCMD="rm -rf *"){
-    if(autoClean){
-        bash(cleanCMD.c_str()); // Clean directory
-        return 1;
-    }
-    int i, ret = system(("echo \"There may be conflicting files in your current directory. If there are none, then press s then enter to skip cleaning and continue execution. If you wish to exit the program, press enter to exit. Otherwise, press c then enter to clean up.\" \n read cleanup \n if [ \"$cleanup\" == \"c\" ]; then \n "+cleanCMD+" && exit 1 \n fi \n if [ \"$cleanup\" == \"s\" ]; then \n exit 1 \n fi \nexit 0 \n").c_str()); // Ask user if they want to run the clean command, then run it if necessary
-    i=WEXITSTATUS(ret); // Get return value: 1 if clean, 0 if not
-    return i;
-}
 
 /**
  @brief Parse iterative nodes in list or pattern mode
@@ -155,7 +129,7 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
         // Modify save filename
         // Parse run object and source object name
         // Replace beam and spectrum lines
-    // Run cosima, log (with run number)
+    // Run cosima (+random seed), log (with run number)
     // Run revan, log (with run number)
     // Run mimrec, log (with run number)
 
@@ -191,8 +165,11 @@ To compile, use `g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -g 
 
 TODO:
 Implement cosima iterations
+
 Implement goemetry iterations
+
 Implement memory watchdog should that become an issue
+
 Setup automated build testing and documentation building
 
 */
@@ -252,8 +229,6 @@ int main(int argc,char** argv){
     // Create threadpool
     vector<thread> threadpool;
 
-    // TODO: Parse geomega section of config, check each geometry, and multithread
-
     // Geomega section
     bash("geomega -f "+geoSetup+" --check-geometry | tee geomega.run0.out");
     ifstream overlapCheck("geomega.run0.out");
@@ -279,7 +254,7 @@ int main(int argc,char** argv){
     // End geomega section
 
     // Generate list of simulations
-    // Innermost vectors are for each possibility, any outer vectors are for having multiple iterations
+    // TODO: Add options for manipulating flux and polarization
 
     vector<string> beamType;
     vector<vector<double>> beam;
