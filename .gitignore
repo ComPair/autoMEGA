@@ -37,3 +37,4 @@ config.yaml
 test/
 *.source
 *.geo.setup
+*.legend
