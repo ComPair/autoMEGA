@@ -120,21 +120,22 @@ void parseOptionsFromDoubleVector(const vector<vector<T>> &values, vector<vector
 void runSimulation(const int threadNumber, const string beamType, const vector<double> &beamOptions, const string &spectrumType, const vector<double> &spectrumOptions, const double &flux, const string &polarizationType, const vector<double> &polarizationOptions){
     // Create legend
     legendLock.lock();
-    legend << "Run number " << threadNumber << ":" << endl;
+    legend << "Run number " << threadNumber << ":\n";
     if(beamType!="unchanged"){
         legend << "Beam: " << beamType << " ";
         for(size_t i=0;i<beamOptions.size();i++) legend << beamOptions[i] << " ";
     }
     if(spectrumType!="unchanged"){
-        legend << endl << "Spectrum: " << spectrumType << " ";
+        legend << "\nSpectrum: " << spectrumType << " ";
         for(size_t i=0;i<spectrumOptions.size();i++) legend << spectrumOptions[i] << " ";
     }
-    if(flux!=-1) legend << endl << "Flux: " << flux << endl;
+    if(flux!=-1) legend << "\nFlux: " << flux << endl;
     if(polarizationType!="unchanged"){
         legend << "Polarization: " << polarizationType << " ";
         for(size_t i=0;i<polarizationOptions.size();i++) legend << polarizationOptions[i] << " ";
     }
-    legend << endl << endl;
+    uint32_t seed = random_seed<uint32_t>();
+    legend << "\nSeed:" << to_string(seed) << "\n" << endl;
     legendLock.unlock();
 
     ifstream originalSource(cosimaSource);
@@ -179,9 +180,9 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
     }
 
     // TODO: Run cosima (+random seed), log (with run number)
-    uint32_t seed = random_seed<uint32_t>();
-    cout << to_string(seed)+"\n";
-    // if(!test) bash("cosima -s")
+    if(!test) bash("cosima -s "+to_string(seed)+" run"+to_string(threadNumber)+".source &> cosima.run"+to_string(threadNumber)+".log");
+    else cout << "cosima -s "+to_string(seed)+" run"+to_string(threadNumber)+".source &> cosima.run"+to_string(threadNumber)+".log\n";
+    
     // TODO: Extract event ratio from log
     // TODO: Run revan, log (with run number)
     // TODO: Run mimrec, log (with run number)
@@ -217,6 +218,8 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
 To redirect stdout and stderr to a file and still view on command line, use `[autoMEGA command & arguments] 2>&1 | tee file.txt`, where `[autoMEGA command & arguments]` is the command and arguments, and `file.txt` is the desired output file.
 
 To compile, use `g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -g -lcurl -lyaml-cpp -Ofast -Wall -o autoMEGA`
+
+You may also have to precompile pipeliningTools first. See that repo for instructions.
 
 TODO:
 Implement cosima iterations
