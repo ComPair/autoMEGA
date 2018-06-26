@@ -178,16 +178,16 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
         newSource << line << endl;
     }
 
-    // TODO: Create new cosima .source file (with run number)
-        // TODO: Modify save filename (with run number)
-        // TODO: Parse run object and source object name
-        // TODO: If they are to be changed, update beam, spectrum, flux, and polarization lines
     // TODO: Run cosima (+random seed), log (with run number)
+    uint32_t seed = random_seed<uint32_t>();
+    cout << to_string(seed)+"\n";
+    // if(!test) bash("cosima -s")
     // TODO: Extract event ratio from log
     // TODO: Run revan, log (with run number)
     // TODO: Run mimrec, log (with run number)
 
     // Cleanup and exit
+    if(!test) bash("rm run"+to_string(threadNumber)+".source");
     currentThreadCount--;
     if(!test && !hook.empty()) slack("Run "+to_string(threadNumber)+" complete.", hook);
     return;
