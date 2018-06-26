@@ -182,8 +182,8 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
     }
 
     // TODO: Run cosima (+random seed), log (with run number)
-    if(!test) bash("cosima -s "+to_string(seed)+" run"+to_string(threadNumber)+".source &> cosima.run"+to_string(threadNumber)+".log");
-    else cout << "cosima -s "+to_string(seed)+" run"+to_string(threadNumber)+".source &> cosima.run"+to_string(threadNumber)+".log\n";
+    if(!test) bash("cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source &> cosima.run"+to_string(threadNumber)+".log");
+    else cout << "cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source &> cosima.run"+to_string(threadNumber)+".log\n";
 
     // TODO: Extract event ratio from log
     // TODO: Run revan, log (with run number)
