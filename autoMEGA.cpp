@@ -182,7 +182,7 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
     // TODO: Run cosima (+random seed), log (with run number)
     if(!test) bash("cosima -s "+to_string(seed)+" run"+to_string(threadNumber)+".source &> cosima.run"+to_string(threadNumber)+".log");
     else cout << "cosima -s "+to_string(seed)+" run"+to_string(threadNumber)+".source &> cosima.run"+to_string(threadNumber)+".log\n";
-    
+
     // TODO: Extract event ratio from log
     // TODO: Run revan, log (with run number)
     // TODO: Run mimrec, log (with run number)
@@ -251,8 +251,7 @@ int main(int argc,char** argv){
     cout << "Using " << maxThreads << " threads." << endl;
 
     // Make sure config file exists
-    struct stat buffer;
-    if(!(stat (settings.c_str(), &buffer) == 0)){
+    if(bash("cat "+settings+">/dev/null")){
         cerr << "File \"" << settings << "\" does not exist, but was requested. Exiting."<< endl;
         return 1;
     }
@@ -275,8 +274,7 @@ int main(int argc,char** argv){
     // Make sure the rest of the files exist
     vector<string> files = {settings,geoSetup,cosimaSource,geomegaSettings,revanSettings,mimrecSettings};
     for(auto& s : files){
-        struct stat buffer;
-        if(!(stat (s.c_str(), &buffer) == 0)){
+        if(bash("cat "+s+">/dev/null")){
             cerr << "File \"" << s << "\" does not exist, but was requested. "<< endl;
             if(!test){
                 cerr << "Exiting." << endl;
@@ -312,7 +310,7 @@ int main(int argc,char** argv){
             cerr << "Exiting." << endl;
             return 2;
         }
-    }
+    } else if(!test) bash("rm geomega.run0.out");
     // End geomega section
 
     // Parse cosima inputs
