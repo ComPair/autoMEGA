@@ -118,6 +118,8 @@ void parseOptionsFromDoubleVector(const vector<vector<T>> &values, vector<vector
 
 */
 void runSimulation(const int threadNumber, const string beamType, const vector<double> &beamOptions, const string &spectrumType, const vector<double> &spectrumOptions, const double &flux, const string &polarizationType, const vector<double> &polarizationOptions){
+    if(!test) slack("Starting run "+to_string(threadNumber),hook);
+
     // Create legend
     legendLock.lock();
     legend << "Run number " << threadNumber << ":\n";
@@ -388,7 +390,7 @@ int main(int argc,char** argv){
                             vector<vector<double>> polarizationOptions;
                             parseOptionsFromDoubleVector(polarization,polarizationOptions);
                             for(size_t o=0;o<polarizationOptions.size();o++){
-                                while(currentThreadCount>maxThreads)sleep(0.1);
+                                while(currentThreadCount>=maxThreads)sleep(0.1);
                                 threadpool.push_back(thread(runSimulation,threadpool.size(),beamType[i], beamOptions[k], spectrumType[j], spectrumOptions[l], flux[m], polarizationType[n],polarizationOptions[o]));
                                 currentThreadCount++;
                             }
