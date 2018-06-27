@@ -191,13 +191,13 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
     if(!test){
         bash("cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz > cosima.run"+to_string(threadNumber)+".log.xz");
         if(!keepAll) bash("rm run"+to_string(threadNumber)+".source");
-        bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz > revan.run"+to_string(threadNumber)+"*.log");
-        if(!keepAll) bash("rm run"+to_string(threadNumber)+"*.sim.gz");
+        bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz > revan.run"+to_string(threadNumber)+".*.log");
+        if(!keepAll) bash("rm run"+to_string(threadNumber)+".*.sim.gz");
     }else{
         cout << "cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz > cosima.run"+to_string(threadNumber)+".log.xz\n";
         if(!keepAll) cout << "rm run"+to_string(threadNumber)+".source\n";
-        cout << "revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz > revan.run"+to_string(threadNumber)+"*.log\n";
-        if(!keepAll) cout << "rm run"+to_string(threadNumber)+"*.sim.gz\n";
+        cout << "revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz > revan.run"+to_string(threadNumber)+".*.log\n";
+        if(!keepAll) cout << "rm run"+to_string(threadNumber)+".*.sim.gz\n";
     }
 
     // TODO: Extract event ratio from log
