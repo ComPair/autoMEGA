@@ -39,6 +39,8 @@ mutex legendLock;
 atomic<int> currentThreadCount(0);
 /// Int to indicate test level (0=real run, otherwise it disables some exiting or notification features)
 atomic<int> test(0);
+/// Bool to indicate what files to keep (false = keep no intermediary files, true = keep all)
+atomic<bool> keepAll(false);
 
 /**
  @brief Parse iterative nodes in list or pattern mode
@@ -114,7 +116,7 @@ void parseOptionsFromDoubleVector(const vector<vector<T>> &values, vector<vector
  Incomplete
 
  ### Notes
- Incomplete
+ Incomplete - Currently supports iterating over Beam, Spectrum, Flux, and Polarization in cosima files, and often runs out of storage...
 
 */
 void runSimulation(const int threadNumber, const string beamType, const vector<double> &beamOptions, const string &spectrumType, const vector<double> &spectrumOptions, const double &flux, const string &polarizationType, const vector<double> &polarizationOptions){
@@ -140,62 +142,63 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
     legend << "\nSeed:" << to_string(seed) << "\n" << endl;
     legendLock.unlock();
 
+    // Open base and run source files
     ifstream originalSource(cosimaSource);
     ofstream newSource("run"+to_string(threadNumber)+".source");
 
     string run;
     string source;
-
-    for(string line;getline(originalSource,line);){
+    for(string line;getline(originalSource,line);){ // Parse and update the source file
         stringstream ss(line);
         string command; ss >> command;
         if(command=="Run") ss >> run;
-        if(command==run+".FileName"){
+        if(command==run+".FileName"){ // Update filename
             newSource << run+".FileName run"+to_string(threadNumber)<<endl;
             continue;
         }
         if(command==run+".Source") ss >> source;
-        if(beamType!="unchanged" && command==source+".Beam"){
+        if(beamType!="unchanged" && command==source+".Beam"){ // Update beam
             newSource << source+".Beam "+beamType+" ";
             for(auto b : beamOptions) newSource << b << " ";
             newSource << endl;
             continue;
         }
-        if(spectrumType!="unchanged" && command==source+".Spectrum"){
+        if(spectrumType!="unchanged" && command==source+".Spectrum"){ // Update Spectrum
             newSource << source+".Spectrum "+spectrumType+" ";
             for(auto s : spectrumOptions) newSource << s << " ";
             newSource << endl;
             continue;
         }
-        if(flux!=-1 && command==source+".Flux"){
+        if(flux!=-1 && command==source+".Flux"){ // Update flux
             newSource << source+".Flux "+to_string(flux) << endl;
             continue;
         }
-        if(polarizationType!="unchanged" && command==source+".Polarization"){
+        if(polarizationType!="unchanged" && command==source+".Polarization"){ // Update polarization
             newSource << source+".Polarization "+polarizationType+" ";
             newSource << setprecision(2);
             for(auto p : polarizationOptions) newSource << p << " ";
             newSource << endl;
             continue;
         }
-        if(command=="Geometry"){
+        if(command=="Geometry"){ // Update geometry file
             newSource << "Geometry "+geoSetup << endl;
             continue;
         }
         newSource << line << endl;
     }
 
-    // TODO: Run cosima (+random seed), log (with run number)
+    // Actually run simulation and analysis
+    // Remove intermediary files when they are no longer necesary (unless keepAll is set)
     if(!test){
         bash("cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz > cosima.run"+to_string(threadNumber)+".log.xz");
-        bash("rm run"+to_string(threadNumber)+".source");
+        if(!keepAll) bash("rm run"+to_string(threadNumber)+".source");
         bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+"|& xz > revan.run"+to_string(threadNumber)+".log");
-        bash("rm run"+to_string(threadNumber)+"*.sim.gz");
+        if(!keepAll) bash("rm run"+to_string(threadNumber)+"*.sim.gz");
     }else{
         cout << "cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz > cosima.run"+to_string(threadNumber)+".log.xz\n";
-        cout << "rm run"+to_string(threadNumber)+".source\n";
+        if(!keepAll) cout << "rm run"+to_string(threadNumber)+".source\n";
         cout << "revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+"|& xz > revan.run"+to_string(threadNumber)+".log\n";
-        cout << "rm run"+to_string(threadNumber)+"*.sim.gz\n";
+        if(!keepAll) cout << "rm run"+to_string(threadNumber)+"*.sim.gz\n";
     }
 
     // TODO: Extract event ratio from log
@@ -226,6 +229,10 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
 
 * `--max-threads` - Max threads. Defaults to system maximum (or 4 if the system max is undetectable).
 
+* `--test` - Enter test mode. Largely undefined behavior, but it will generally perform a dry run. Use at your own risk, it may break everything.
+
+* `--keep-all` - Keep all intermediary files
+
 ### Notes:
 
 To redirect stdout and stderr to a file and still view on command line, use `[autoMEGA command & arguments] 2>&1 | tee file.txt`, where `[autoMEGA command & arguments]` is the command and arguments, and `file.txt` is the desired output file.
@@ -235,13 +242,10 @@ To compile, use `g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -g 
 You may also have to precompile pipeliningTools first. See that repo for instructions.
 
 TODO:
-Implement cosima iterations
 
-Implement goemetry iterations
+- Implement goemetry iterations
 
-Implement memory watchdog should that become an issue
-
-Setup automated build testing and documentation building
+- Run Mimrec and perform overall analysis
 
 */
 int main(int argc,char** argv){
@@ -259,6 +263,7 @@ int main(int argc,char** argv){
             else if(string(argv[i])=="--max-threads") maxThreads = atoi(argv[++i]);
         }
         if(string(argv[i])=="--test") test = 1;
+        else if(string(argv[i])=="--keep-all") keepAll = 1;
     }
 
     cout << "Using " << maxThreads << " threads." << endl;
@@ -279,6 +284,7 @@ int main(int argc,char** argv){
     if(config["threads"]) maxThreads = config["threads"].as<int>();
     if(config["address"]) address = config["address"].as<string>();
     if(config["hook"]) hook = config["hook"].as<string>();
+    if(config["keepAll"]) keepAll = config["keepAll"].as<bool>();
 
     // Make sure required files were given
     if(geoSetup=="empty") {cout << "Geometry setup required. Exiting." << endl;return 1;}
@@ -311,14 +317,10 @@ int main(int argc,char** argv){
     ifstream overlapCheck("geomega.run0.out");
     bool check0=0,check1=0;
     if(overlapCheck.is_open()) for(string line;getline(overlapCheck,line);){
-        if(line=="No extrusions and overlaps detected with ROOT (ROOT claims to be able to detect 95% of them)"){
-            check0=1;
-        }
+        if(line=="No extrusions and overlaps detected with ROOT (ROOT claims to be able to detect 95% of them)") check0=1;
         if(line=="-------- Cosima output start --------"){
             getline(overlapCheck,line);
-            if(line=="-------- Cosima output stop ---------"){
-                check1=1;
-            }
+            if(line=="-------- Cosima output stop ---------") check1=1;
         }
     }
     if(!(check0&&check1)){
@@ -327,10 +329,11 @@ int main(int argc,char** argv){
             cerr << "Exiting." << endl;
             return 2;
         }
-    } else if(!test) bash("rm geomega.run0.out");
+    } else if(!keepAll) bash("rm geomega.run0.out");
     // End geomega section
 
-    // Parse cosima inputs
+    // Parse cosima inputs (this part is somewhat messy, if I have time I should consider generalizing the structure or at least cleaning it up)
+    // Beam
     vector<string> beamType;
     vector<vector<double>> beam;
     if(config["cosima"]["beam"]){
@@ -347,6 +350,7 @@ int main(int argc,char** argv){
         vector<double> temp(1,0);
         beam.push_back(temp);
     }
+    // Spectrum
     vector<string> spectrumType;
     vector<vector<double>> spectrum;
     if(config["cosima"]["spectrum"]){
@@ -363,9 +367,11 @@ int main(int argc,char** argv){
         vector<double> temp(1,0);
         spectrum.push_back(temp);
     }
+    //Flux
     vector<double> flux;
     if(config["cosima"]["flux"]) parseIterativeNode(config["cosima"]["flux"],flux);
     else flux.push_back(-1);
+    // Polarization
     vector<string> polarizationType;
     vector<vector<double>> polarization;
     if(config["cosima"]["polarization"]){
@@ -388,7 +394,7 @@ int main(int argc,char** argv){
     for(size_t i=0;i<beam.size();i++) totalSims*=beam[i].size();
     for(size_t i=0;i<spectrum.size();i++) totalSims*=spectrum[i].size();
     for(size_t i=0;i<polarization.size();i++) totalSims*=polarization[i].size();
-    cout << totalSims << endl;
+    cout << totalSims << "total simulations." << endl;
 
     // Start all simulation threads.
     legend.open("run.legend");
