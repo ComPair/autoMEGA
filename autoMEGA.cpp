@@ -199,7 +199,6 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
     }
 
     // TODO: Extract event ratio from log
-    // TODO: Run revan, log (with run number)
     // TODO: Run mimrec, log (with run number)
 
     // Cleanup and exit
@@ -299,6 +298,10 @@ int main(int argc,char** argv){
 
     // Check directory
     if(!test && directoryEmpty(".")) return 3; // Make sure its empty
+
+    // Start watchdog thread(s)
+    thread watchdog0(storageWatchdog,2000);
+    // thread watchdog1(memoryWatchdog,0.1);
 
     // Create threadpool
     vector<thread> threadpool;
@@ -424,5 +427,7 @@ int main(int argc,char** argv){
         if(!hook.empty()) slack("Simulation complete",hook);
         if(!address.empty()) email(address,"Simulation Complete");
     }
+    exitFlag=1;
+    watchdog0.join();
     return 0;
 }
