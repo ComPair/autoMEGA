@@ -188,11 +188,13 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
     // TODO: Run cosima (+random seed), log (with run number)
     if(!test){
         bash("cosima -s "+to_string(seed)+" run"+to_string(threadNumber)+".source &> cosima.run"+to_string(threadNumber)+".log");
-        bash("revan -c "+revanSettings+" -n -a -t -f run"+to_string(threadNumber)+".sim -g "+geoSetup+"&> revan.run"+to_string(threadNumber)+".log");
+        bash("rm run"+to_string(threadNumber)+".source");
+        bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim -g "+geoSetup+"&> revan.run"+to_string(threadNumber)+".log");
         bash("rm run"+to_string(threadNumber)+".sim");
     }else{
         cout << "cosima -s "+to_string(seed)+" run"+to_string(threadNumber)+".source &> cosima.run"+to_string(threadNumber)+".log\n";
-        cout << "revan -c"+revanSettings+" -n -a -t -f run"+to_string(threadNumber)+".sim -g "+geoSetup+"&> revan.run"+to_string(threadNumber)+".log\n";
+        cout << "rm run"+to_string(threadNumber)+".source\n";
+        cout << "revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim -g "+geoSetup+"&> revan.run"+to_string(threadNumber)+".log\n";
         cout << "rm run"+to_string(threadNumber)+".sim" << endl;
     }
 
@@ -201,7 +203,6 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
     // TODO: Run mimrec, log (with run number)
 
     // Cleanup and exit
-    if(!test) bash("rm run"+to_string(threadNumber)+".source");
     currentThreadCount--;
     if(!test && !hook.empty()) slack("Run "+to_string(threadNumber)+" complete.", hook);
     return;
