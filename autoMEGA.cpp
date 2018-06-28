@@ -40,6 +40,14 @@ atomic<int> currentThreadCount(0);
 atomic<int> test(0);
 /// Bool to indicate what files to keep (false = keep no intermediary files, true = keep all)
 atomic<bool> keepAll(false);
+/// Bool to enable geomega system
+atomic<bool> geomegaEnable(true);
+/// Bool to enable cosima system
+atomic<bool> cosimaEnable(true);
+/// Bool to enable revan system
+atomic<bool> revanEnable(true);
+/// Bool to enable mimrec system
+atomic<bool> mimrecEnable(true);
 
 /**
  @brief Parse iterative nodes in list or pattern mode
@@ -132,7 +140,7 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
         legend << "\nSpectrum: " << spectrumType << " ";
         for(size_t i=0;i<spectrumOptions.size();i++) legend << spectrumOptions[i] << " ";
     }
-    if(flux!=-1) legend << "\nFlux: " << flux << endl;
+    if(flux!=-1) legend << "\nFlux: " << flux << "\n";
     if(polarizationType!="unchanged"){
         legend << "Polarization: " << polarizationType << " ";
         for(size_t i=0;i<polarizationOptions.size();i++) legend << polarizationOptions[i] << " ";
@@ -145,59 +153,68 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
     ifstream originalSource(cosimaSource);
     ofstream newSource("run"+to_string(threadNumber)+".source");
 
-    string run;
-    string source;
-    for(string line;getline(originalSource,line);){ // Parse and update the source file
-        stringstream ss(line);
-        string command; ss >> command;
-        if(command=="Run") ss >> run;
-        if(command==run+".FileName"){ // Update filename
-            newSource << run+".FileName run"+to_string(threadNumber)<<endl;
-            continue;
+    if(cosimaEnable){
+        string run;
+        string source;
+        for(string line;getline(originalSource,line);){ // Parse and update the source file
+            stringstream ss(line);
+            string command; ss >> command;
+            if(command=="Run") ss >> run;
+            if(command==run+".FileName"){ // Update filename
+                newSource << run+".FileName run"+to_string(threadNumber)<<endl;
+                continue;
+            }
+            if(command==run+".Source") ss >> source;
+            if(beamType!="unchanged" && command==source+".Beam"){ // Update beam
+                newSource << source+".Beam "+beamType+" ";
+                for(auto b : beamOptions) newSource << b << " ";
+                newSource << endl;
+                continue;
+            }
+            if(spectrumType!="unchanged" && command==source+".Spectrum"){ // Update Spectrum
+                newSource << source+".Spectrum "+spectrumType+" ";
+                for(auto s : spectrumOptions) newSource << s << " ";
+                newSource << endl;
+                continue;
+            }
+            if(flux!=-1 && command==source+".Flux"){ // Update flux
+                newSource << source+".Flux "+to_string(flux) << endl;
+                continue;
+            }
+            if(polarizationType!="unchanged" && command==source+".Polarization"){ // Update polarization
+                newSource << source+".Polarization "+polarizationType+" ";
+                newSource << setprecision(2);
+                for(auto p : polarizationOptions) newSource << p << " ";
+                newSource << endl;
+                continue;
+            }
+            if(command=="Geometry"){ // Update geometry file
+                newSource << "Geometry "+geoSetup << endl;
+                continue;
+            }
+            newSource << line << endl;
         }
-        if(command==run+".Source") ss >> source;
-        if(beamType!="unchanged" && command==source+".Beam"){ // Update beam
-            newSource << source+".Beam "+beamType+" ";
-            for(auto b : beamOptions) newSource << b << " ";
-            newSource << endl;
-            continue;
-        }
-        if(spectrumType!="unchanged" && command==source+".Spectrum"){ // Update Spectrum
-            newSource << source+".Spectrum "+spectrumType+" ";
-            for(auto s : spectrumOptions) newSource << s << " ";
-            newSource << endl;
-            continue;
-        }
-        if(flux!=-1 && command==source+".Flux"){ // Update flux
-            newSource << source+".Flux "+to_string(flux) << endl;
-            continue;
-        }
-        if(polarizationType!="unchanged" && command==source+".Polarization"){ // Update polarization
-            newSource << source+".Polarization "+polarizationType+" ";
-            newSource << setprecision(2);
-            for(auto p : polarizationOptions) newSource << p << " ";
-            newSource << endl;
-            continue;
-        }
-        if(command=="Geometry"){ // Update geometry file
-            newSource << "Geometry "+geoSetup << endl;
-            continue;
-        }
-        newSource << line << endl;
     }
 
-    // Actually run simulation and analysis
-    // Remove intermediary files when they are no longer necesary (unless keepAll is set)
+    // Actually run simulation and analysis and remove intermediary files when they are no longer necesary (unless keepAll is set)
     if(!test){
-        bash("cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz > cosima.run"+to_string(threadNumber)+".log.xz");
-        if(!keepAll) bash("rm run"+to_string(threadNumber)+".source");
-        bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz > revan.run"+to_string(threadNumber)+".*.log");
-        if(!keepAll) bash("rm run"+to_string(threadNumber)+".*.sim.gz");
+        if(cosimaEnable){
+            bash("cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz > cosima.run"+to_string(threadNumber)+".log.xz");
+            if(!keepAll) bash("rm run"+to_string(threadNumber)+".source");
+        }
+        if(revanEnable){
+            bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz > revan.run"+to_string(threadNumber)+".*.log.xz");
+            if(!keepAll) bash("rm run"+to_string(threadNumber)+".*.sim.gz");
+        }
     }else{
-        cout << "cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz > cosima.run"+to_string(threadNumber)+".log.xz\n";
-        if(!keepAll) cout << "rm run"+to_string(threadNumber)+".source\n";
-        cout << "revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz > revan.run"+to_string(threadNumber)+".*.log\n";
-        if(!keepAll) cout << "rm run"+to_string(threadNumber)+".*.sim.gz\n";
+        if(cosimaEnable){
+            cout << "cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz > cosima.run"+to_string(threadNumber)+".log.xz" << endl;
+            if(!keepAll) cout << "rm run"+to_string(threadNumber)+".source" << endl;
+        }
+        if(revanEnable){
+            cout << "revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz > revan.run"+to_string(threadNumber)+".*.log.xz" << endl;
+            if(!keepAll) cout << "rm run"+to_string(threadNumber)+".*.sim.gz" << endl;
+        }
     }
 
     // TODO: Extract event ratio from log
@@ -278,8 +295,8 @@ int main(int argc,char** argv){
     if(config["geomegaSettings"]) geomegaSettings = config["geomegaSettings"].as<string>();
     if(config["revanSettings"]) revanSettings = config["revanSettings"].as<string>();
     if(config["mimrecSettings"]) mimrecSettings = config["mimrecSettings"].as<string>();
-    if(config["geoSetup"]) geoSetup = config["geoSetup"].as<string>();
-    if(config["cosima"]["source"]) cosimaSource = config["cosima"]["source"].as<string>();
+    if(config["geomega"]["baseFilename"]) geoSetup = config["geomega"]["baseFilename"].as<string>();
+    if(config["cosima"]["filename"]) cosimaSource = config["cosima"]["filename"].as<string>();
     if(config["threads"]) maxThreads = config["threads"].as<int>();
     if(config["address"]) address = config["address"].as<string>();
     if(config["hook"]) hook = config["hook"].as<string>();
@@ -311,25 +328,27 @@ int main(int argc,char** argv){
     // Create threadpool
     vector<thread> threadpool;
 
-    // Geomega section
-    bash("geomega -f "+geoSetup+" --check-geometry | tee geomega.run0.out");
-    ifstream overlapCheck("geomega.run0.out");
-    bool check0=0,check1=0;
-    if(overlapCheck.is_open()) for(string line;getline(overlapCheck,line);){
-        if(line=="No extrusions and overlaps detected with ROOT (ROOT claims to be able to detect 95% of them)") check0=1;
-        if(line=="-------- Cosima output start --------"){
-            getline(overlapCheck,line);
-            if(line=="-------- Cosima output stop ---------") check1=1;
+    if(geomegaEnable){
+        // Geomega section
+        bash("geomega -f "+geoSetup+" --check-geometry | tee geomega.run0.out");
+        ifstream overlapCheck("geomega.run0.out");
+        bool check0=0,check1=0;
+        if(overlapCheck.is_open()) for(string line;getline(overlapCheck,line);){
+            if(line=="No extrusions and overlaps detected with ROOT (ROOT claims to be able to detect 95% of them)") check0=1;
+            if(line=="-------- Cosima output start --------"){
+                getline(overlapCheck,line);
+                if(line=="-------- Cosima output stop ---------") check1=1;
+            }
         }
+        if(!(check0&&check1)){
+            cerr << "Geometry error." << endl;
+            if(!test){
+                cerr << "Exiting." << endl;
+                return 2;
+            }
+        } else if(!keepAll) bash("rm geomega.run0.out");
+        // End geomega section
     }
-    if(!(check0&&check1)){
-        cerr << "Geometry error." << endl;
-        if(!test){
-            cerr << "Exiting." << endl;
-            return 2;
-        }
-    } else if(!keepAll) bash("rm geomega.run0.out");
-    // End geomega section
 
     // Parse cosima inputs (this part is somewhat messy, if I have time I should consider generalizing the structure or at least cleaning it up)
     // Beam
