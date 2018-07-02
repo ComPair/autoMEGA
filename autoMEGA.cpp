@@ -50,10 +50,10 @@ atomic<bool> keepAll(false);
 
  Values are assumed as doubles if they are in three element format, otherwise they are assumed as strings.
 */
-vector<string> parseIterativeNode(YAML::Node contents){
+vector<string> parseIterativeNode(YAML::Node contents, std::string prepend=""){
     // if(test) cout << contents << endl;
 
-    vector<string> options; options.push_back("");
+    vector<string> options; options.push_back(prepend);
     vector<string> newOptions;
     for(size_t i=0;i<contents.size();i++){
         // Parse options into vector of strings
@@ -145,100 +145,102 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
     vector<string> files;
     vector<int> lines;
     vector<vector<string>> options;
-    for(size_t i=0;i<geomega["parameters"].size();i++){
-        files.push_back(geomega["parameters"][i]["filename"].as<string>());
-        lines.push_back(geomega["parameters"][i]["lineNumber"].as<int>());
-        options.push_back(parseIterativeNode(geomega["parameters"][i]["contents"]));
-    }
+    if(geomega["parameters"].size()!=0){
+        for(size_t i=0;i<geomega["parameters"].size();i++){
+            files.push_back(geomega["parameters"][i]["filename"].as<string>());
+            lines.push_back(geomega["parameters"][i]["lineNumber"].as<int>());
+            options.push_back(parseIterativeNode(geomega["parameters"][i]["contents"]));
+        }
 
-    legendLock.lock();
-    legend.open("geo.legend");
+        legendLock.lock();
+        legend.open("geo.legend");
 
-    // Create new files
-    vector<size_t> odometer(lines.size(),0);
-    int position=odometer.size()-1;
-    while(position>=0){
-        if(odometer[position]==options[position].size()){
-            odometer[position]=0;
-            if(--position<0) break;
-            odometer[position]++;
-        } else {
-            // Create legend
-            legend << "Geometry";
-            for(auto& o:odometer) legend << "." << o;
-            legend << "\n";
-            for(size_t i=0;i<lines.size();i++) legend << "File:" << files[i] << "\nLine: " << lines[i] << "\nOption: " << options[i][odometer[i]] << "\n";
-            legend << "\n";
+        // Create new files
+        vector<size_t> odometer(lines.size(),0);
+        int position=odometer.size()-1;
+        while(position>=0){
+            if(odometer[position]==options[position].size()){
+                odometer[position]=0;
+                if(--position<0) break;
+                odometer[position]++;
+            } else {
+                // Create legend
+                legend << "Geometry";
+                for(auto& o:odometer) legend << "." << o;
+                legend << "\n";
+                for(size_t i=0;i<lines.size();i++) legend << "File:" << files[i] << "\nLine: " << lines[i] << "\nOption: " << options[i][odometer[i]] << "\n";
+                legend << "\n";
 
-            // Read base geometry
-            ifstream baseGeometryIn("g.geo.setup");
-            stringstream alteredGeometry;
-            copy(istreambuf_iterator<char>(baseGeometryIn),istreambuf_iterator<char>(),ostreambuf_iterator<char>(alteredGeometry));
+                // Read base geometry
+                ifstream baseGeometryIn("g.geo.setup");
+                stringstream alteredGeometry;
+                copy(istreambuf_iterator<char>(baseGeometryIn),istreambuf_iterator<char>(),ostreambuf_iterator<char>(alteredGeometry));
 
-            // Alter geometry
-            for(size_t i=0;i<odometer.size();i++){
-                stringstream newGeometry;
-                string line;
+                // Alter geometry
+                for(size_t i=0;i<odometer.size();i++){
+                    stringstream newGeometry;
+                    string line;
 
-                // Seek to "///Include "+files[i]
-                while(getline(alteredGeometry,line)){
-                    newGeometry << line << "\n";
-                    if(line=="///Include "+files[i]) break;
-                }
+                    // Seek to "///Include "+files[i]
+                    while(getline(alteredGeometry,line)){
+                        newGeometry << line << "\n";
+                        if(line=="///Include "+files[i]) break;
+                    }
 
-                // Seek lines[i] lines ahead
-                for(int j=0;j<lines[i]-1;j++){
-                    getline(alteredGeometry,line);
-                    newGeometry << line << "\n";
+                    // Seek lines[i] lines ahead
+                    for(int j=0;j<lines[i]-1;j++){
+                        getline(alteredGeometry,line);
+                        newGeometry << line << "\n";
 
-                    // Check we havent passed "///End "+files[i]
-                    stringstream newLine(line);
-                    string command,file; newLine >> command >> file;
-                    // Skip over other includes
-                    if(command=="///Include"){
-                        while(getline(alteredGeometry,line)){
-                            newGeometry << line << "\n";
-                            if(line=="///End "+files[i]){
-                                cerr << "Attempted to alter line number past end of file." << endl;
-                                if(!test){ cerr << "Exiting." << endl; return 4;}
+                        // Check we havent passed "///End "+files[i]
+                        stringstream newLine(line);
+                        string command,file; newLine >> command >> file;
+                        // Skip over other includes
+                        if(command=="///Include"){
+                            while(getline(alteredGeometry,line)){
+                                newGeometry << line << "\n";
+                                if(line=="///End "+files[i]){
+                                    cerr << "Attempted to alter line number past end of file." << endl;
+                                    if(!test){ cerr << "Exiting." << endl; return 4;}
+                                }
+                                if(line=="///End "+file) break;
                             }
-                            if(line=="///End "+file) break;
+                        }
+                        if(line=="///End "+files[i]){
+                            cerr << "Attempted to alter line number past end of file." << endl;
+                            if(!test){ cerr << "Exiting." << endl; return 4;}
                         }
                     }
-                    if(line=="///End "+files[i]){
-                        cerr << "Attempted to alter line number past end of file." << endl;
-                        if(!test){ cerr << "Exiting." << endl; return 4;}
-                    }
+
+                    // Replace that line with options[i][odometer[i]]
+                    getline(alteredGeometry,line);
+                    line=options[i][odometer[i]];
+                    newGeometry<<line<<"\n";
+
+                    // Copy rest of stream and swap streams
+                    while(getline(alteredGeometry,line)) newGeometry << line << "\n";
+                    alteredGeometry.swap(newGeometry);
                 }
 
-                // Replace that line with options[i][odometer[i]]
-                getline(alteredGeometry,line);
-                line=options[i][odometer[i]];
-                newGeometry<<line<<"\n";
+                // Create new file
+                string fileName = "g";
+                for(auto& o:odometer) fileName+="."+to_string(o);
+                fileName+=".geo.setup";
+                ofstream newGeometry(fileName);
+                geometries.push_back(fileName);
 
-                // Copy rest of stream and swap streams
-                while(getline(alteredGeometry,line)) newGeometry << line << "\n";
-                alteredGeometry.swap(newGeometry);
+                // Write to file and close it
+                newGeometry << alteredGeometry.rdbuf();
+                newGeometry.close();
+
+                // Manage odometer
+                position=odometer.size()-1;
+                odometer[position]++;
             }
-
-            // Create new file
-            string fileName = "g";
-            for(auto& o:odometer) fileName+="."+to_string(o);
-            fileName+=".geo.setup";
-            ofstream newGeometry(fileName);
-            geometries.push_back(fileName);
-
-            // Write to file and close it
-            newGeometry << alteredGeometry.rdbuf();
-            newGeometry.close();
-
-            // Manage odometer
-            position=odometer.size()-1;
-            odometer[position]++;
         }
-    }
-    legend.close();
-    legendLock.unlock();
+        legend.close();
+        legendLock.unlock();
+    } else geometries.push_back("g.geo.setup");
 
     // Verify all geometries
     if(!test) for(size_t i=0;i<geometries.size();i++){
@@ -271,8 +273,55 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
  Incomplete
 */
 int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geometries){
-    // TODO: Parse cosima parameters to create a bunch of base run?.source files
-    // TODO: Add geometry files to each of those files to make a bunch of run?.g?.source files
+    string baseFileName = cosima["filename"].as<string>();
+    // TODO: Parse iterative nodes, but need to specially format them with the correct source and name.
+    map<string,vector<string>> options;
+    for(size_t i=0;i<cosima["parameters"].size();i++){
+        if(cosima["parameters"][i]["beam"]) options[cosima["parameters"][i]["source"].as<string>()+".Beam"] = parseIterativeNode(cosima["parameters"][i]["beam"],cosima["parameters"][i]["source"].as<string>()+".Beam");
+        if(cosima["parameters"][i]["spectrum"]) options[cosima["parameters"][i]["source"].as<string>()+".Spectrum"] = parseIterativeNode(cosima["parameters"][i]["spectrum"],cosima["parameters"][i]["source"].as<string>()+".Spectrum");
+        if(cosima["parameters"][i]["flux"]) options[cosima["parameters"][i]["source"].as<string>()+".Flux"] = parseIterativeNode(cosima["parameters"][i]["flux"],cosima["parameters"][i]["source"].as<string>()+".Flux");
+        if(cosima["parameters"][i]["polarization"]) options[cosima["parameters"][i]["source"].as<string>()+".Polarization"] = parseIterativeNode(cosima["parameters"][i]["polarization"],cosima["parameters"][i]["source"].as<string>()+".Polarization");
+    }
+    if(geometries.size()!=0){
+        for(auto& g : geometries) g = "Geometry "+g;
+        options["Geometry"] = geometries;
+    }
+
+    // Read base geometry
+    ifstream baseSource(cosima["filename"].as<string>());
+    stringstream baseSourceStream;
+    copy(istreambuf_iterator<char>(baseSource),istreambuf_iterator<char>(),ostreambuf_iterator<char>(baseSourceStream));
+    vector<string> alteredSources;
+    alteredSources.push_back(baseSourceStream.str());
+
+    // Parse cosima parameters to create a bunch of base run?.source files
+    for(auto &elem:options){
+        vector<string> newSources;
+        for(auto &option:elem.second){
+            for(auto &s : alteredSources){
+                stringstream alteredSource(s);
+                stringstream newSource;
+                for(string line; getline(alteredSource,line);){
+                    stringstream ss(line);
+                    string command, rest; ss >> command >> rest;
+                    if(command==elem.first){
+                        newSource << option << "\n";
+                    } else newSource << line << "\n";
+                }
+                newSources.push_back(newSource.str());
+            }
+        }
+        alteredSources.swap(newSources);
+    }
+
+    for(size_t i=0;i<alteredSources.size();i++){
+        string filename = "run"+to_string(i)+".source";
+        sources.push_back(filename);
+        ofstream out(filename);
+        out << alteredSources[i];
+        out.close();
+    }
+
     // TODO: Create cosima legend
     return 0;
 }
@@ -313,14 +362,12 @@ void runSimulation(const string source, const int threadNumber){
     // Actually run simulation and analysis
     // Remove intermediary files when they are no longer necesary (unless keepAll is set)
     if(!test){
-        bash("cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz > cosima.run"+to_string(threadNumber)+".log.xz");
-        if(!keepAll) bash("rm run"+to_string(threadNumber)+".source");
-        bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz > revan.run"+to_string(threadNumber)+".*.log");
+        bash("cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz");
+        bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".*.log");
         if(!keepAll) bash("rm run"+to_string(threadNumber)+".*.sim.gz");
     }else{
-        cout << "cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz > cosima.run"+to_string(threadNumber)+".log.xz\n";
-        if(!keepAll) cout << "rm run"+to_string(threadNumber)+".source\n";
-        cout << "revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz > revan.run"+to_string(threadNumber)+".*.log\n";
+        cout << "cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz\n";
+        cout << "revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".*.log\n";
         if(!keepAll) cout << "rm run"+to_string(threadNumber)+".*.sim.gz\n";
     }
 
@@ -375,13 +422,13 @@ Cosima settings:
 
     * `source` - Name of the source to modify
 
-    * `beam` - Beam settings: Array with the first element as a string, then any number of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
+    * `beam` - Beam settings: Array of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
 
-    * `spectrum` - Spectrum settings: Array with the first element as a string, then any number of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
+    * `spectrum` - Spectrum settings: Array of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
 
-    * `flux` - One value in the standard format. (Optional, if not present, then it is not modified from the base file).
+    * `flux` - Array of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
 
-    * `polarization` - Polarization settings: Array with the first element as a string, then any number of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
+    * `polarization` - Polarization settings: Array of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
 
 Geomega settings:
 
@@ -413,7 +460,7 @@ TODO:
 
 - Single analysis
 
-- Run Mimrec and perform overall analysis
+- Overall analysis
 
 - Improvement: linked parsing
 
@@ -465,7 +512,7 @@ int main(int argc,char** argv){
 
     // Create threadpool
     vector<thread> threadpool;
-    legend.open("run.legend")
+    legend.open("run.legend");
 
     // Calculate total number of simulations
     cout << sources.size() << " total simulations." << endl;
