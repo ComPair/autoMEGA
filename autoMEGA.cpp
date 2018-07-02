@@ -14,10 +14,6 @@ using namespace std;
 
 /// Yaml comfig file for the simulation
 string settings = "config.yaml";
-/// Base geometry setup file for the simulations
-string geoSetup = "empty";
-/// Base cosima .source file for the simulations
-string cosimaSource = "empty";
 /// Geomega settings file (defaults to geomega default)
 string geomegaSettings = "~/.geomega.cfg";
 /// Revan settings file (defaults to revan default)
@@ -40,14 +36,6 @@ atomic<int> currentThreadCount(0);
 atomic<int> test(0);
 /// Bool to indicate what files to keep (false = keep no intermediary files, true = keep all)
 atomic<bool> keepAll(false);
-/// Bool to enable geomega system
-atomic<bool> geomegaEnable(true);
-/// Bool to enable cosima system
-atomic<bool> cosimaEnable(true);
-/// Bool to enable revan system
-atomic<bool> revanEnable(true);
-/// Bool to enable mimrec system
-atomic<bool> mimrecEnable(true);
 
 /**
  @brief Parse iterative nodes in list or pattern mode
@@ -55,63 +43,298 @@ atomic<bool> mimrecEnable(true);
  ## Parse iterative nodes
 
  ### Arguments
- * `YAML::NODE config` - Node to parse
-
- * `vector<T> &values` - Vector in wich to put all parsed values
+ * `YAML::NODE contents` - Node to parse
 
  ### Notes
  There are two distinct parsing modes. If there are exactly three elements in the list, then it assumes it is in the format [first value, last value, step size]. If there is exactly one element, it is assumed it is a list of all values to use.
+
+ Values are assumed as doubles if they are in three element format, otherwise they are assumed as strings.
 */
-template<typename T>
-void parseIterativeNode(YAML::Node config, vector<T> &values){
-    if(test) cout << config << endl;
-    if(config.size()==3){
-        for(T i=config[0].as<T>();i<config[1].as<T>();i+=config[2].as<T>()) values.push_back(i);
-    } else for(size_t i=0;i<config[0].size();i++) {
-        values.push_back(config[0][i].as<T>());
+vector<string> parseIterativeNode(YAML::Node contents, std::string prepend=""){
+    // if(test) cout << contents << endl;
+
+    vector<string> options; options.push_back(prepend);
+    vector<string> newOptions;
+    for(size_t i=0;i<contents.size();i++){
+        // Parse options into vector of strings
+        vector<string> parameters;
+        if(contents[i].size()==3){
+            double final = contents[i][1].as<double>();
+            double step = contents[i][2].as<double>();
+            for(double initial = contents[i][0].as<double>();initial<final;initial+=step) parameters.push_back(to_string(initial));
+        } else for(size_t j=0;j<contents[i][0].size();j++) parameters.push_back(contents[i][0][j].as<string>());
+        for(size_t j=0;j<options.size();j++){
+            for(size_t k=0;k<parameters.size();k++)
+                newOptions.push_back(options[j]+" "+parameters[k]);
+        }
+        options.clear();
+        options = std::move(newOptions);
     }
-    if(test){
-        for(T t : values) cout << t << ",";
-        cout << endl;
+
+    // if(test){
+        // for(auto o : options) cout << o << endl;
+        // cout << endl;
+    // }
+    return options;
+}
+
+
+/**
+ @brief Outputs (to file) input file with all included files fully evaluated
+
+ ## Output (to to file) input file with all included files fully evaluated
+
+ ### Arguments
+ - `string inputFile` - Input filename
+
+ - `ofstream& out` - Ofstream output object
+*/
+int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
+    if(recursionDepth>1024){
+        cerr << "Exceeded max recursion depth of 1024. This is likely due to a curcular dependency. If not, then your geometry is way to complex. Exiting." << endl;
+        return -1;
     }
+    if(recursionDepth==0) out << "///Include " << inputFile << "\n";
+
+    ifstream input(inputFile);
+    if(!input.is_open() || !input.good()){
+        cerr << "Could not open included file \"" << inputFile << "\"." << endl;
+        return 1;
+    }
+    for(string line;getline(input,line);){
+        stringstream ss(line);
+        string command; ss >> command;
+        if(command=="Include"){
+            out << "///" << line << "\n";
+            string includedFile; ss >> includedFile;
+            string baseFile = includedFile;
+            if(includedFile[0]!='/') includedFile=inputFile.substr(0,inputFile.find_last_of('/'))+"/"+includedFile; // Workaround for relative file references
+            if(geoMerge(includedFile,out,++recursionDepth)) return 1;
+            out << "///End " << baseFile << "\n";
+        }else{
+            out << line << "\n";
+        }
+    }
+    return 0;
+}
+
+
+
+/**
+ @brief Parse geomega settings and setup .geo.setup files
+
+ ## Parse geomega settings and setup .geo.setup files
+
+ ### Arguments
+ - `YAML::NODE geomega` - Geomega node to aprse settings from
+
+ - `vector<string> &geometries` - Vector of filenames of generated files (return by reference)
+
+ ### Return value
+ Returns the success value: 0 for success, return code otherwise
+
+ ### Notes
+ Merges all dependencies into a single file, my default g.geo.setup, then creates additional files from there. In my experience this has worked fine, but let me know if there is a problem with your geometry.
+*/
+int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
+    // Merge all files together
+    ofstream baseGeometry("g.geo.setup");
+    if(!baseGeometry.is_open()){ cerr << "Could not create new base geometry file. Exiting" << endl; return 3;}
+    if(geoMerge(geomega["filename"].as<string>(),baseGeometry)) return 1;
+    baseGeometry.close();
+
+    // Generate all options
+    vector<string> files;
+    vector<int> lines;
+    vector<vector<string>> options;
+    if(geomega["parameters"].size()!=0){
+        for(size_t i=0;i<geomega["parameters"].size();i++){
+            files.push_back(geomega["parameters"][i]["filename"].as<string>());
+            lines.push_back(geomega["parameters"][i]["lineNumber"].as<int>());
+            options.push_back(parseIterativeNode(geomega["parameters"][i]["contents"]));
+        }
+
+        legendLock.lock();
+        legend.open("geo.legend");
+
+        // Create new files
+        vector<size_t> odometer(lines.size(),0);
+        int position=odometer.size()-1;
+        while(position>=0){
+            if(odometer[position]==options[position].size()){
+                odometer[position]=0;
+                if(--position<0) break;
+                odometer[position]++;
+            } else {
+                // Create legend
+                legend << "Geometry";
+                for(auto& o:odometer) legend << "." << o;
+                legend << "\n";
+                for(size_t i=0;i<lines.size();i++) legend << "File:" << files[i] << "\nLine: " << lines[i] << "\nOption: " << options[i][odometer[i]] << "\n";
+                legend << "\n";
+
+                // Read base geometry
+                ifstream baseGeometryIn("g.geo.setup");
+                stringstream alteredGeometry;
+                copy(istreambuf_iterator<char>(baseGeometryIn),istreambuf_iterator<char>(),ostreambuf_iterator<char>(alteredGeometry));
+
+                // Alter geometry
+                for(size_t i=0;i<odometer.size();i++){
+                    stringstream newGeometry;
+                    string line;
+
+                    // Seek to "///Include "+files[i]
+                    while(getline(alteredGeometry,line)){
+                        newGeometry << line << "\n";
+                        if(line=="///Include "+files[i]) break;
+                    }
+
+                    // Seek lines[i] lines ahead
+                    for(int j=0;j<lines[i]-1;j++){
+                        getline(alteredGeometry,line);
+                        newGeometry << line << "\n";
+
+                        // Check we havent passed "///End "+files[i]
+                        stringstream newLine(line);
+                        string command,file; newLine >> command >> file;
+                        // Skip over other includes
+                        if(command=="///Include"){
+                            while(getline(alteredGeometry,line)){
+                                newGeometry << line << "\n";
+                                if(line=="///End "+files[i]){
+                                    cerr << "Attempted to alter line number past end of file." << endl;
+                                    if(!test){ cerr << "Exiting." << endl; return 4;}
+                                }
+                                if(line=="///End "+file) break;
+                            }
+                        }
+                        if(line=="///End "+files[i]){
+                            cerr << "Attempted to alter line number past end of file." << endl;
+                            if(!test){ cerr << "Exiting." << endl; return 4;}
+                        }
+                    }
+
+                    // Replace that line with options[i][odometer[i]]
+                    getline(alteredGeometry,line);
+                    line=options[i][odometer[i]];
+                    newGeometry<<line<<"\n";
+
+                    // Copy rest of stream and swap streams
+                    while(getline(alteredGeometry,line)) newGeometry << line << "\n";
+                    alteredGeometry.swap(newGeometry);
+                }
+
+                // Create new file
+                string fileName = "g";
+                for(auto& o:odometer) fileName+="."+to_string(o);
+                fileName+=".geo.setup";
+                ofstream newGeometry(fileName);
+                geometries.push_back(fileName);
+
+                // Write to file and close it
+                newGeometry << alteredGeometry.rdbuf();
+                newGeometry.close();
+
+                // Manage odometer
+                position=odometer.size()-1;
+                odometer[position]++;
+            }
+        }
+        legend.close();
+        legendLock.unlock();
+    } else geometries.push_back("g.geo.setup");
+
+    // Verify all geometries
+    if(!test) for(size_t i=0;i<geometries.size();i++){
+        bash("geomega -f "+geometries[i]+" --check-geometry | tee geomega.run"+to_string(i)+".out");
+        ifstream overlapCheck("geomega.run"+to_string(i)+".out");
+        bool check0=0,check1=0;
+        if(overlapCheck.is_open()) for(string line;getline(overlapCheck,line);){
+            if(line=="No extrusions and overlaps detected with ROOT (ROOT claims to be able to detect 95% of them)") check0=1;
+            if(line=="-------- Cosima output start --------" && (getline(overlapCheck,line) || line=="-------- Cosima output stop ---------")) check1=1;
+        }
+        if(!(check0&&check1)){cerr << "Geometry error. Exiting." << endl; return 2;}
+        if(!keepAll) bash("rm geomega.run"+to_string(i)+".out");
+    } else for(size_t i=0;i<geometries.size();i++) cout << "geomega -f "+geometries[i]+" --check-geometry | tee geomega.run"+to_string(i)+".out" << endl;
+
+    return 0;
 }
 
 /**
- @brief Parse vectors of parameter's options to create vectors of options's parameters
+ @brief Parse cosima settings and setup source files
 
- ## Parse vectors of parameter's options to create vectors of options's parameters
-
- The input is a double vector where the inner list is a list of options for the ith parameter and the outer list is the list of parameters. The function creates a double vector where the inner list is a list of parameters, and the outer list is of each option.
+ ## Parse cosima settings and setup source files
 
  ### Arguments
- * `const vector<vector<T>> &values` - Vector to parse
+ - `YAML::Node cosima` - Cosima node to parse settings from
 
- * `vector<vector<T>> &results` - Vector in wich to put all parsed values
+ - `vector<string> &sources` - Vector of strings of output filenames (return by reference)
 
+ - `vector<string> &geometries` - Vector of strings of geometry filenames
+
+ ### Return value
+ Returns the success value: 0 for success, return code otherwise.
+
+ ### Notes
+ Only replaces line in a source file, it does not add them as that would be undefined behavior. Make sure that all of your operations replace lines, otherwise they will not be parsed correctly. This may not always throw an error, so manually check that your iterations are properly parsing.
 */
-template<typename T>
-void parseOptionsFromDoubleVector(const vector<vector<T>> &values, vector<vector<T>> &results){
-    vector<T> option(values.size(),0);
-    vector<size_t> positions(values.size(),0); // Initialize vectors
-    for(size_t j=0;j<option.size();j++) option[j]=values[j][positions[j]];
-    results.push_back(option); // Push first option
-
-    int i=positions.size()-1;
-    while(i>=0){ // Treat like odometer, the LSB counts up, rolls over, then moves to the next one. When the whole thing rolls over, then its done.
-        if(positions[i]<values[i].size()){
-            option[i]=values[i][positions[i]];
-            positions[i]++;
-            results.push_back(option);
-            i=positions.size()-1;
-        } else {
-            positions[i] = 0;
-            option[i]=values[i][positions[i]];
-            i--;
-        }
+int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geometries){
+    string baseFileName = cosima["filename"].as<string>();
+    // Make sure config file exists
+    if(bash("cat "+baseFileName+">/dev/null")){
+        cerr << "File \"" << baseFileName << "\" does not exist, but was requested. Exiting."<< endl;
+        return 1;
+    }
+    
+    // Parse iterative nodes, but need to specially format them with the correct source and name.
+    map<string,vector<string>> options;
+    for(size_t i=0;i<cosima["parameters"].size();i++){
+        if(cosima["parameters"][i]["beam"]) options[cosima["parameters"][i]["source"].as<string>()+".Beam"] = parseIterativeNode(cosima["parameters"][i]["beam"],cosima["parameters"][i]["source"].as<string>()+".Beam");
+        if(cosima["parameters"][i]["spectrum"]) options[cosima["parameters"][i]["source"].as<string>()+".Spectrum"] = parseIterativeNode(cosima["parameters"][i]["spectrum"],cosima["parameters"][i]["source"].as<string>()+".Spectrum");
+        if(cosima["parameters"][i]["flux"]) options[cosima["parameters"][i]["source"].as<string>()+".Flux"] = parseIterativeNode(cosima["parameters"][i]["flux"],cosima["parameters"][i]["source"].as<string>()+".Flux");
+        if(cosima["parameters"][i]["polarization"]) options[cosima["parameters"][i]["source"].as<string>()+".Polarization"] = parseIterativeNode(cosima["parameters"][i]["polarization"],cosima["parameters"][i]["source"].as<string>()+".Polarization");
+    }
+    if(geometries.size()!=0){
+        for(auto& g : geometries) g = "Geometry "+g;
+        options["Geometry"] = geometries;
     }
 
-    sort( results.begin(), results.end() ); // Remove duplicates
-    results.erase( unique( results.begin(), results.end() ), results.end() );
+    // Read base geometry
+    ifstream baseSource(cosima["filename"].as<string>());
+    stringstream baseSourceStream;
+    copy(istreambuf_iterator<char>(baseSource),istreambuf_iterator<char>(),ostreambuf_iterator<char>(baseSourceStream));
+    vector<string> alteredSources;
+    alteredSources.push_back(baseSourceStream.str());
+
+    // Parse cosima parameters to create a bunch of base run?.source files
+    for(auto &elem:options){
+        vector<string> newSources;
+        for(auto &option:elem.second){
+            for(auto &s : alteredSources){
+                stringstream alteredSource(s);
+                stringstream newSource;
+                for(string line; getline(alteredSource,line);){
+                    stringstream ss(line);
+                    string command; ss >> command;
+                    if(command==elem.first){
+                        newSource << option << "\n";
+                    } else newSource << line << "\n";
+                }
+                newSources.push_back(newSource.str());
+            }
+        }
+        alteredSources.swap(newSources);
+    }
+
+    for(size_t i=0;i<alteredSources.size();i++){
+        string filename = "run"+to_string(i)+".source";
+        sources.push_back(filename);
+        ofstream out(filename);
+        out << alteredSources[i];
+        out.close();
+    }
+
+    return 0;
 }
 
 /**
@@ -120,105 +343,45 @@ void parseOptionsFromDoubleVector(const vector<vector<T>> &values, vector<vector
  ## Run one simulation and analysis (cosima, revan, mimrec) (incomplete)
 
  ### Arguments
- Incomplete
+ - `const string source` - *.source file for cosima
+
+ - `const int threadNumber` - Thread number to avoid file name collisions
 
  ### Notes
- Incomplete - Currently supports iterating over Beam, Spectrum, Flux, and Polarization in cosima files, and often runs out of storage...
+ Incomplete - Currently only runs revan and cosima, and often runs out of storage...
 
 */
-void runSimulation(const int threadNumber, const string beamType, const vector<double> &beamOptions, const string &spectrumType, const vector<double> &spectrumOptions, const double &flux, const string &polarizationType, const vector<double> &polarizationOptions){
+void runSimulation(const string source, const int threadNumber){
     if(!test) slack("Starting run "+to_string(threadNumber),hook);
+
+    uint32_t seed = random_seed<uint32_t>();
 
     // Create legend
     legendLock.lock();
-    legend << "Run number " << threadNumber << ":\n";
-    if(beamType!="unchanged"){
-        legend << "Beam: " << beamType << " ";
-        for(size_t i=0;i<beamOptions.size();i++) legend << beamOptions[i] << " ";
-    }
-    if(spectrumType!="unchanged"){
-        legend << "\nSpectrum: " << spectrumType << " ";
-        for(size_t i=0;i<spectrumOptions.size();i++) legend << spectrumOptions[i] << " ";
-    }
-    if(flux!=-1) legend << "\nFlux: " << flux << "\n";
-    if(polarizationType!="unchanged"){
-        legend << "Polarization: " << polarizationType << " ";
-        for(size_t i=0;i<polarizationOptions.size();i++) legend << polarizationOptions[i] << " ";
-    }
-    uint32_t seed = random_seed<uint32_t>();
+    legend << "Run number " << threadNumber << ":";
+    legend << "\nSource: " << source;
     legend << "\nSeed:" << to_string(seed) << "\n" << endl;
     legendLock.unlock();
 
-    // Open base and run source files
-    ifstream originalSource(cosimaSource);
-    ofstream newSource("run"+to_string(threadNumber)+".source");
+    // Get geometry file
+    ifstream sourceFile(source);
+    string geoSetup;
+    while(!sourceFile.eof() && geoSetup!="Geometry") sourceFile>>geoSetup;
+    if(geoSetup!="Geometry"){cerr << "Cannot locate geometry file. Exiting." << endl; return;}
+    sourceFile>>geoSetup;
+    sourceFile.close();
 
-    if(cosimaEnable){
-        string run;
-        string source;
-        for(string line;getline(originalSource,line);){ // Parse and update the source file
-            stringstream ss(line);
-            string command; ss >> command;
-            if(command=="Run") ss >> run;
-            if(command==run+".FileName"){ // Update filename
-                newSource << run+".FileName run"+to_string(threadNumber)<<endl;
-                continue;
-            }
-            if(command==run+".Source") ss >> source;
-            if(beamType!="unchanged" && command==source+".Beam"){ // Update beam
-                newSource << source+".Beam "+beamType+" ";
-                for(auto b : beamOptions) newSource << b << " ";
-                newSource << endl;
-                continue;
-            }
-            if(spectrumType!="unchanged" && command==source+".Spectrum"){ // Update Spectrum
-                newSource << source+".Spectrum "+spectrumType+" ";
-                for(auto s : spectrumOptions) newSource << s << " ";
-                newSource << endl;
-                continue;
-            }
-            if(flux!=-1 && command==source+".Flux"){ // Update flux
-                newSource << source+".Flux "+to_string(flux) << endl;
-                continue;
-            }
-            if(polarizationType!="unchanged" && command==source+".Polarization"){ // Update polarization
-                newSource << source+".Polarization "+polarizationType+" ";
-                newSource << setprecision(2);
-                for(auto p : polarizationOptions) newSource << p << " ";
-                newSource << endl;
-                continue;
-            }
-            if(command=="Geometry"){ // Update geometry file
-                newSource << "Geometry "+geoSetup << endl;
-                continue;
-            }
-            newSource << line << endl;
-        }
-    }
-
-    // Actually run simulation and analysis and remove intermediary files when they are no longer necesary (unless keepAll is set)
+    // Actually run simulation and analysis
+    // Remove intermediary files when they are no longer necesary (unless keepAll is set)
     if(!test){
-        if(cosimaEnable){
-            bash("cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz > cosima.run"+to_string(threadNumber)+".log.xz");
-            if(!keepAll) bash("rm run"+to_string(threadNumber)+".source");
-        }
-        if(revanEnable){
-            bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz > revan.run"+to_string(threadNumber)+".*.log.xz");
-            if(!keepAll) bash("rm run"+to_string(threadNumber)+".*.sim.gz");
-        }
+        bash("cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz");
+        bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".*.log");
+        if(!keepAll) bash("rm run"+to_string(threadNumber)+".*.sim.gz");
     }else{
-        if(cosimaEnable){
-            cout << "cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz > cosima.run"+to_string(threadNumber)+".log.xz" << endl;
-            if(!keepAll) cout << "rm run"+to_string(threadNumber)+".source" << endl;
-        }
-        if(revanEnable){
-            cout << "revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz > revan.run"+to_string(threadNumber)+".*.log.xz" << endl;
-            if(!keepAll) cout << "rm run"+to_string(threadNumber)+".*.sim.gz" << endl;
-        }
+        cout << "cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz\n";
+        cout << "revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".*.log\n";
+        if(!keepAll) cout << "rm run"+to_string(threadNumber)+".*.sim.gz\n";
     }
-
-    // TODO: Extract event ratio from log
-    // TODO: Run mimrec, log (with run number)
 
     // Cleanup and exit
     currentThreadCount--;
@@ -229,25 +392,71 @@ void runSimulation(const int threadNumber, const string beamType, const vector<d
 /**
 ## autoMEGA
 
-### Arguments (also configurable from config yaml file):
+### Arguments:
 
-* `--settings` - Settings file - defaults to "config.yaml"
+ * `--settings` - Settings file - defaults to "config.yaml"
 
-* `--geoSetup` - Base geometry file to use. Requried.
+ * `--test` - Enter test mode. Largely undefined behavior, but it will generally perform a dry run. Use at your own risk, it may break everything.
 
-* `--source` - Base cosima source to use. Required.
+### Configuration:
+Most settings are only configurable from the yaml configuration file. The format is:
 
-* `--geomega-settings` - Geomega config file. Defaults to the system default ("~/.geomega.cfg").
+autoMEGA settings:
+ * `address` - Email to send an email to when done (relies on sendmail)
 
-* `--revan-settings` - Revan config file. Defaults to the system default ("~/.revan.cfg").
+ * `hook` - Slack webhook to send notification to when done
 
-* `--mimrec-settings` - Mimrec config file. Defaults to the system default ("~/.mimrec.cfg").
+ * `maxThreads` - Maximum threads to use (defaults to system threads if not given)
 
-* `--max-threads` - Max threads. Defaults to system maximum (or 4 if the system max is undetectable).
+ * `keepAll` - Flag to keep intermediary files (defaults to off = 0)
 
-* `--test` - Enter test mode. Largely undefined behavior, but it will generally perform a dry run. Use at your own risk, it may break everything.
+General settings files:
 
-* `--keep-all` - Keep all intermediary files
+ * `geomegaSettings` - Defaults to system default (`~/geomega.cfg`)
+
+ * `revanSettings` - Defaults to system default (`~/revan.cfg`)
+
+ * `mimrecSettings` - Defaults to system default (`~/mimrec.cfg`)
+
+Standard parameter format:
+
+If an array is given, it is assumed to be in one of two formats.
+
+If there are three values, then the parameter starts at the first value and increments at the third value until it gets to the second value.
+
+If the array is a double array of values, those are taken as the literal values of the parameter.
+
+Cosima settings:
+
+ * `filename` - Base cosima .source file
+
+ * `parameters` - Array of parameters, formatted as such:
+
+    * `source` - Name of the source to modify
+
+    * `beam` - Beam settings: Array of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
+
+    * `spectrum` - Spectrum settings: Array of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
+
+    * `flux` - Array of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
+
+    * `polarization` - Polarization settings: Array of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
+
+Geomega settings:
+
+ * `filename` - Base cosima .source file
+
+ * `parameters` - Array of parameters, formatted as such:
+
+    * `filename` - Filename of the file to modify
+
+    * `line number` - line number of the file to modify
+
+    * `contents` - Contents of the line. Array of values(including strings) in the standard format, to be separated by spaces in the file.
+
+Mimrec settings:
+
+ * Incomplete.
 
 ### Notes:
 
@@ -259,9 +468,13 @@ You may also have to precompile pipeliningTools first. See that repo for instruc
 
 TODO:
 
-- Implement goemetry iterations
+- Single analysis
 
-- Run Mimrec and perform overall analysis
+- Overall analysis
+
+- Improvement: YAML Cosima and geomega legends
+
+- Improvement: linked parsing
 
 */
 int main(int argc,char** argv){
@@ -269,20 +482,9 @@ int main(int argc,char** argv){
 
     // Parse command line arguments
     for(int i=0;i<argc;i++){
-        if(i<argc-1){
-            if(string(argv[i])=="--settings") settings = argv[++i];
-            else if(string(argv[i])=="--geoSetup") geoSetup = argv[++i];
-            else if(string(argv[i])=="--source") cosimaSource = argv[++i];
-            else if(string(argv[i])=="--geomega-settings") geomegaSettings = argv[++i];
-            else if(string(argv[i])=="--revan-settings") revanSettings = argv[++i];
-            else if(string(argv[i])=="--mimrec-settings") mimrecSettings = argv[++i];
-            else if(string(argv[i])=="--max-threads") maxThreads = atoi(argv[++i]);
-        }
+        if(i<argc-1) if(string(argv[i])=="--settings") settings = argv[++i];
         if(string(argv[i])=="--test") test = 1;
-        else if(string(argv[i])=="--keep-all") keepAll = 1;
     }
-
-    cout << "Using " << maxThreads << " threads." << endl;
 
     // Make sure config file exists
     if(bash("cat "+settings+">/dev/null")){
@@ -292,31 +494,26 @@ int main(int argc,char** argv){
 
     // Parse config file
     YAML::Node config = YAML::LoadFile(settings);
+    if(config["address"]) address = config["address"].as<string>();
+    if(config["hook"]) hook = config["hook"].as<string>();
+    if(config["maxThreads"]) maxThreads = config["maxThreads"].as<int>();
+    if(config["keepAll"]) keepAll = config["keepAll"].as<bool>();
+
     if(config["geomegaSettings"]) geomegaSettings = config["geomegaSettings"].as<string>();
     if(config["revanSettings"]) revanSettings = config["revanSettings"].as<string>();
     if(config["mimrecSettings"]) mimrecSettings = config["mimrecSettings"].as<string>();
-    if(config["geomega"]["baseFilename"]) geoSetup = config["geomega"]["baseFilename"].as<string>();
-    if(config["cosima"]["filename"]) cosimaSource = config["cosima"]["filename"].as<string>();
-    if(config["threads"]) maxThreads = config["threads"].as<int>();
-    if(config["address"]) address = config["address"].as<string>();
-    if(config["hook"]) hook = config["hook"].as<string>();
-    if(config["keepAll"]) keepAll = config["keepAll"].as<bool>();
 
-    // Make sure required files were given
-    if(geoSetup=="empty") {cout << "Geometry setup required. Exiting." << endl;return 1;}
-    if(cosimaSource=="empty") {cout << "Cosima source required. Exiting." << endl;return 1;}
+    vector<string> geometries;
+    if(config["geomega"]) if(geomegaSetup(config["geomega"],geometries)!=0) return 2;
+    if(test) for(auto&s:geometries)cout << s << endl;
 
-    // Make sure the rest of the files exist
-    vector<string> files = {settings,geoSetup,cosimaSource,geomegaSettings,revanSettings,mimrecSettings};
-    for(auto& s : files){
-        if(bash("cat "+s+">/dev/null")){
-            cerr << "File \"" << s << "\" does not exist, but was requested. "<< endl;
-            if(!test){
-                cerr << "Exiting." << endl;
-                return 1;
-            }
-        }
-    }
+    vector<string> sources;
+    if(config["cosima"]) if(cosimaSetup(config["cosima"],sources,geometries)!=0) return 3;
+    if(test) for(auto&s:sources)cout << s << endl;
+
+    if(config["mimrec"]) ;
+
+    cout << "Using " << maxThreads << " threads." << endl;
 
     // Check directory
     if(!test && directoryEmpty(".")) return 3; // Make sure its empty
@@ -327,120 +524,20 @@ int main(int argc,char** argv){
 
     // Create threadpool
     vector<thread> threadpool;
-
-    if(geomegaEnable){
-        // Geomega section
-        bash("geomega -f "+geoSetup+" --check-geometry | tee geomega.run0.out");
-        ifstream overlapCheck("geomega.run0.out");
-        bool check0=0,check1=0;
-        if(overlapCheck.is_open()) for(string line;getline(overlapCheck,line);){
-            if(line=="No extrusions and overlaps detected with ROOT (ROOT claims to be able to detect 95% of them)") check0=1;
-            if(line=="-------- Cosima output start --------"){
-                getline(overlapCheck,line);
-                if(line=="-------- Cosima output stop ---------") check1=1;
-            }
-        }
-        if(!(check0&&check1)){
-            cerr << "Geometry error." << endl;
-            if(!test){
-                cerr << "Exiting." << endl;
-                return 2;
-            }
-        } else if(!keepAll) bash("rm geomega.run0.out");
-        // End geomega section
-    }
-
-    // Parse cosima inputs (this part is somewhat messy, if I have time I should consider generalizing the structure or at least cleaning it up)
-    // Beam
-    vector<string> beamType;
-    vector<vector<double>> beam;
-    if(config["cosima"]["beam"]){
-        // First parameter is a string for the type. Use another list to iterate over.
-        for(size_t i=0;i<config["cosima"]["beam"][0].size();i++) beamType.push_back(config["cosima"]["beam"][0][i].as<string>());
-        // The rest of the parameters are for options for the beam type. Make sure that they are valid with the cosima manual. If there are three arguments, I will assume they are in the format [initial value, final value, delta value], if there is only one, I will assume it is a nested list of values to iterate over
-        for(size_t i=1;i<config["cosima"]["beam"].size();i++){
-            vector<double> tempValues;
-            parseIterativeNode<double>(config["cosima"]["beam"][i],tempValues);
-            beam.push_back(tempValues);
-        }
-    } else {
-        beamType.push_back("unchanged");
-        vector<double> temp(1,0);
-        beam.push_back(temp);
-    }
-    // Spectrum
-    vector<string> spectrumType;
-    vector<vector<double>> spectrum;
-    if(config["cosima"]["spectrum"]){
-        // First parameter is a string for the type. Use another list to iterate over.
-        for(size_t i=0;i<config["cosima"]["spectrum"][0].size();i++) spectrumType.push_back(config["cosima"]["spectrum"][0][i].as<string>());
-        // The rest of the parameters are for options for the spectrum
-        for(size_t i=1;i<config["cosima"]["spectrum"].size();i++){
-            vector<double> tempValues;
-            parseIterativeNode<double>(config["cosima"]["spectrum"][i],tempValues);
-            spectrum.push_back(tempValues);
-        }
-    } else {
-        spectrumType.push_back("unchanged");
-        vector<double> temp(1,0);
-        spectrum.push_back(temp);
-    }
-    //Flux
-    vector<double> flux;
-    if(config["cosima"]["flux"]) parseIterativeNode(config["cosima"]["flux"],flux);
-    else flux.push_back(-1);
-    // Polarization
-    vector<string> polarizationType;
-    vector<vector<double>> polarization;
-    if(config["cosima"]["polarization"]){
-        // First parameter is a string for the type. Use another list to iterate over.
-        for(size_t i=0;i<config["cosima"]["polarization"][0].size();i++) polarizationType.push_back(config["cosima"]["polarization"][0][i].as<string>());
-        // The rest of the parameters are for options for the spectrum
-        for(size_t i=1;i<config["cosima"]["polarization"].size();i++){
-            vector<double> tempValues;
-            parseIterativeNode<double>(config["cosima"]["polarization"][i],tempValues);
-            polarization.push_back(tempValues);
-        }
-    } else{
-        polarizationType.push_back("unchanged");
-        vector<double> temp(1,0);
-        polarization.push_back(temp);
-    }
+    legend.open("run.legend");
 
     // Calculate total number of simulations
-    int totalSims = beamType.size()*spectrumType.size()*flux.size()*polarizationType.size();
-    for(size_t i=0;i<beam.size();i++) totalSims*=beam[i].size();
-    for(size_t i=0;i<spectrum.size();i++) totalSims*=spectrum[i].size();
-    for(size_t i=0;i<polarization.size();i++) totalSims*=polarization[i].size();
-    cout << totalSims << "total simulations." << endl;
+    cout << sources.size() << " total simulations." << endl;
 
     // Start all simulation threads.
-    legend.open("run.legend");
-    for(size_t i=0;i<beamType.size();i++){
-        for(size_t j=0;j<spectrumType.size();j++){
-            vector<vector<double>> beamOptions;
-            parseOptionsFromDoubleVector(beam,beamOptions);
-            for(size_t k=0;k<beamOptions.size();k++){
-                vector<vector<double>> spectrumOptions;
-                parseOptionsFromDoubleVector(spectrum,spectrumOptions);
-                for(size_t l=0;l<spectrumOptions.size();l++){
-                    for(size_t m=0;m<flux.size();m++){
-                        for(size_t n=0;n<polarizationType.size();n++){
-                            vector<vector<double>> polarizationOptions;
-                            parseOptionsFromDoubleVector(polarization,polarizationOptions);
-                            for(size_t o=0;o<polarizationOptions.size();o++){
-                                while(currentThreadCount>=maxThreads)sleep(0.1);
-                                threadpool.push_back(thread(runSimulation,threadpool.size(),beamType[i], beamOptions[k], spectrumType[j], spectrumOptions[l], flux[m], polarizationType[n],polarizationOptions[o]));
-                                currentThreadCount++;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    for(size_t i=0;i<sources.size();i++){
+        while(currentThreadCount>=maxThreads)sleep(0.1);
+        threadpool.push_back(thread(runSimulation,sources[i],threadpool.size()));
+        currentThreadCount++;
     }
     // Join simulation threads
-    for(size_t i=0;i<threadpool.size();i++)threadpool[i].join();
+    for(size_t i=0;i<threadpool.size();i++) threadpool[i].join();
+    legend.close();
 
     // TODO: Gather data from each simulation output and use it to make a plot of something
 

@@ -38,3 +38,4 @@ test/
 *.source
 *.geo.setup
 *.legend
+*.tmp
