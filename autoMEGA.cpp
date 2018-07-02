@@ -205,8 +205,6 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
                             if(line=="///End "+file) break;
                         }
                     }
-
-
                     if(line=="///End "+files[i]){
                         cerr << "Attempted to alter line number past end of file." << endl;
                         if(!test){ cerr << "Exiting." << endl; return 4;}
@@ -234,6 +232,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
             newGeometry << alteredGeometry.rdbuf();
             newGeometry.close();
 
+            // Manage odometer
             position=odometer.size()-1;
             odometer[position]++;
         }
@@ -273,8 +272,8 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
 */
 int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geometries){
     // TODO: Parse cosima parameters to create a bunch of base run?.source files
-    // TODO: Add geometry files to each of those files to make a bunch of run?.geoOption?.source files
-    // TODO: Create run legend
+    // TODO: Add geometry files to each of those files to make a bunch of run?.g?.source files
+    // TODO: Create cosima legend
     return 0;
 }
 
@@ -295,10 +294,35 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
 void runSimulation(const string source, const int threadNumber){
     if(!test) slack("Starting run "+to_string(threadNumber),hook);
 
-    // TODO: Generate random seed
-    // TODO: Run compressed cosima (and compressed log)
-    // TODO: Run compressed revan (and compressed log)
-    // TODO: Delete sim files
+    uint32_t seed = random_seed<uint32_t>();
+
+    // Create legend
+    legendLock.lock();
+    legend << "Run number " << threadNumber << ":";
+    legend << "\nSource: " << source;
+    legend << "\nSeed:" << to_string(seed) << "\n" << endl;
+    legendLock.unlock();
+
+    // Get geometry file
+    ifstream sourceFile(source);
+    string geoSetup;
+    while(geoSetup!="Geometry") sourceFile>>geoSetup;
+    sourceFile>>geoSetup;
+    sourceFile.close();
+
+    // Actually run simulation and analysis
+    // Remove intermediary files when they are no longer necesary (unless keepAll is set)
+    if(!test){
+        bash("cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz > cosima.run"+to_string(threadNumber)+".log.xz");
+        if(!keepAll) bash("rm run"+to_string(threadNumber)+".source");
+        bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz > revan.run"+to_string(threadNumber)+".*.log");
+        if(!keepAll) bash("rm run"+to_string(threadNumber)+".*.sim.gz");
+    }else{
+        cout << "cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz > cosima.run"+to_string(threadNumber)+".log.xz\n";
+        if(!keepAll) cout << "rm run"+to_string(threadNumber)+".source\n";
+        cout << "revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz > revan.run"+to_string(threadNumber)+".*.log\n";
+        if(!keepAll) cout << "rm run"+to_string(threadNumber)+".*.sim.gz\n";
+    }
 
     // Cleanup and exit
     currentThreadCount--;
@@ -441,7 +465,7 @@ int main(int argc,char** argv){
 
     // Create threadpool
     vector<thread> threadpool;
-    legend.open("run.legend");
+    legend.open("run.legend")
 
     // Calculate total number of simulations
     cout << sources.size() << " total simulations." << endl;
@@ -454,6 +478,7 @@ int main(int argc,char** argv){
     }
     // Join simulation threads
     for(size_t i=0;i<threadpool.size();i++) threadpool[i].join();
+    legend.close();
 
     // TODO: Gather data from each simulation output and use it to make a plot of something
 
