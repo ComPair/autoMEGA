@@ -360,7 +360,8 @@ void runSimulation(const string source, const int threadNumber){
     // Get geometry file
     ifstream sourceFile(source);
     string geoSetup;
-    while(geoSetup!="Geometry") sourceFile>>geoSetup;
+    while(!sourceFile.eof() && geoSetup!="Geometry") sourceFile>>geoSetup;
+    if(geoSetup!="Geometry"){cerr << "Cannot locate geometry file. Exiting." << endl; return;}
     sourceFile>>geoSetup;
     sourceFile.close();
 
