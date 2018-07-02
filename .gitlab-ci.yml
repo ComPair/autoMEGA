@@ -12,6 +12,9 @@ build:
     - g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -g -lcurl -lyaml-cpp -Ofast -Wall -o autoMEGA
 
 pages:
+  only:
+    refs:
+      - master
   stage: deploy
   script:
     - apt update && apt -y install make autoconf doxygen doxygen-doc doxygen-latex doxygen-gui graphviz libdw-dev libxtst-dev libelf-dev libcurl4-gnutls-dev libboost-dev libyaml-cpp-dev
