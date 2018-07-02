@@ -280,6 +280,12 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
 */
 int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geometries){
     string baseFileName = cosima["filename"].as<string>();
+    // Make sure config file exists
+    if(bash("cat "+baseFileName+">/dev/null")){
+        cerr << "File \"" << baseFileName << "\" does not exist, but was requested. Exiting."<< endl;
+        return 1;
+    }
+    
     // Parse iterative nodes, but need to specially format them with the correct source and name.
     map<string,vector<string>> options;
     for(size_t i=0;i<cosima["parameters"].size();i++){
