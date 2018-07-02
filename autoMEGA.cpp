@@ -126,13 +126,15 @@ int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
  ## Parse geomega settings and setup .geo.setup files
 
  ### Arguments
- Incomplete
+ - `YAML::NODE geomega` - Geomega node to aprse settings from
+
+ - `vector<string> &geometries` - Vector of filenames of generated files (return by reference)
 
  ### Return value
- Incomplete
+ Returns the success value: 0 for success, return code otherwise
 
  ### Notes
- Incomplete
+ Merges all dependencies into a single file, my default g.geo.setup, then creates additional files from there. In my experience this has worked fine, but let me know if there is a problem with your geometry.
 */
 int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
     // Merge all files together
@@ -264,17 +266,21 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
  ## Parse cosima settings and setup source files
 
  ### Arguments
- Incomplete
+ - `YAML::Node cosima` - Cosima node to parse settings from
+
+ - `vector<string> &sources` - Vector of strings of output filenames (return by reference)
+
+ - `vector<string> &geometries` - Vector of strings of geometry filenames
 
  ### Return value
- Incomplete
+ Returns the success value: 0 for success, return code otherwise.
 
  ### Notes
- Incomplete
+ Only replaces line in a source file, it does not add them as that would be undefined behavior. Make sure that all of your operations replace lines, otherwise they will not be parsed correctly. This may not always throw an error, so manually check that your iterations are properly parsing.
 */
 int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geometries){
     string baseFileName = cosima["filename"].as<string>();
-    // TODO: Parse iterative nodes, but need to specially format them with the correct source and name.
+    // Parse iterative nodes, but need to specially format them with the correct source and name.
     map<string,vector<string>> options;
     for(size_t i=0;i<cosima["parameters"].size();i++){
         if(cosima["parameters"][i]["beam"]) options[cosima["parameters"][i]["source"].as<string>()+".Beam"] = parseIterativeNode(cosima["parameters"][i]["beam"],cosima["parameters"][i]["source"].as<string>()+".Beam");
@@ -303,7 +309,7 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
                 stringstream newSource;
                 for(string line; getline(alteredSource,line);){
                     stringstream ss(line);
-                    string command, rest; ss >> command >> rest;
+                    string command; ss >> command;
                     if(command==elem.first){
                         newSource << option << "\n";
                     } else newSource << line << "\n";
@@ -322,7 +328,6 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
         out.close();
     }
 
-    // TODO: Create cosima legend
     return 0;
 }
 
@@ -332,12 +337,12 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
  ## Run one simulation and analysis (cosima, revan, mimrec) (incomplete)
 
  ### Arguments
- Incomplete
+ - `const string source` - *.source file for cosima
+
+ - `const int threadNumber` - Thread number to avoid file name collisions
 
  ### Notes
- Incomplete - Currently supports iterating over Beam, Spectrum, Flux, and Polarization in cosima files, and often runs out of storage...
-
- Need to create legend entry and then run geomega check, cosima, revan, mimrec
+ Incomplete - Currently only runs revan and cosima, and often runs out of storage...
 
 */
 void runSimulation(const string source, const int threadNumber){
@@ -456,11 +461,11 @@ You may also have to precompile pipeliningTools first. See that repo for instruc
 
 TODO:
 
-- Cosima parsing
-
 - Single analysis
 
 - Overall analysis
+
+- Improvement: YAML Cosima and geomega legends
 
 - Improvement: linked parsing
 
