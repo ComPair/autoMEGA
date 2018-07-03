@@ -1,0 +1,31 @@
+---
+  address: "person@example.com"
+  hook: "https://hooks.slack.com/services/INSERT/WEBHOOK/HERE"
+  maxThreads: 24
+  keepAll: false
+
+  geomegaSettings: "~/geomega.cfg"
+  revanSettings: "~/revan.cfg"
+  mimrecSettings: "~/mimrec.cfg"
+
+  geomega:
+    filename: "../Geometry/AMEGO_4x4TowerModel/AmegoBase.geo.setup"
+    parameters:
+      0:
+        filename: "SiStripDetector.geo"
+        lineNumber: 22
+        contents: [[["For I 60"]], [[1,2]], [1,10,5]]
+      1:
+        filename: "ACDDetector.geo"
+        lineNumber: 27
+        contents: [[["topACDPanel.Shape BRIK 52.5 52.5"]],  [[0.5,0.7,1]]]
+
+  cosima:
+    filename: "run.source"
+    parameters:
+      0:
+        source: "Pos"
+        beam: [[["FarFieldPointSource"]],[0,180,10],[0,360,10]]
+        spectrum: [[["Mono"]],[[31,100,316,1000,3162,10000,31622,100000,316228,1000000,3162277,10000000]]]
+        flux: [[[1000]]]
+        polarization: [[["true"]],[[1.0]],[[0.0]],[[0.0]],[[1.0]]]
