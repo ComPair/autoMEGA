@@ -87,7 +87,6 @@ vector<string> parseIterativeNode(YAML::Node contents, std::string prepend=""){
 
  ### Arguments
  - `string inputFile` - Input filename
-
  - `ofstream& out` - Ofstream output object
 */
 int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
@@ -130,7 +129,6 @@ int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
 
  ### Arguments
  - `YAML::NODE geomega` - Geomega node to aprse settings from
-
  - `vector<string> &geometries` - Vector of filenames of generated files (return by reference)
 
  ### Return value
@@ -274,9 +272,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
 
  ### Arguments
  - `YAML::Node cosima` - Cosima node to parse settings from
-
  - `vector<string> &sources` - Vector of strings of output filenames (return by reference)
-
  - `vector<string> &geometries` - Vector of strings of geometry filenames
 
  ### Return value
@@ -354,7 +350,6 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
 
  ### Arguments
  - `const string source` - *.source file for cosima
-
  - `const int threadNumber` - Thread number to avoid file name collisions
 
  ### Notes
@@ -362,8 +357,6 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
 
 */
 void runSimulation(const string source, const int threadNumber){
-    if(!test) slack("Starting run "+to_string(threadNumber),hook);
-
     // Get seed
     uint32_t seed = random_seed<uint32_t>();
 
@@ -405,29 +398,21 @@ void runSimulation(const string source, const int threadNumber){
 
 ### Arguments:
 
- * `--settings` - Settings file - defaults to "config.yaml"
-
- * `--test` - Enter test mode. Largely undefined behavior, but it will generally perform a dry run. Use at your own risk, it may break everything.
+ - `--settings` - Settings file - defaults to "config.yaml"
+ - `--test` - Enter test mode. Largely undefined behavior, but it will generally perform a dry run. Use at your own risk, it may break everything.
 
 ### Configuration:
 Most settings are only configurable from the yaml configuration file. The format is:
 
 autoMEGA settings:
- * `address` - Email to send an email to when done (relies on sendmail). If not present, email notifications are disabled
-
- * `hook` - Slack webhook to send notification to when done. If not present, slack notifications are disabled.
-
- * `maxThreads` - Maximum threads to use (defaults to system threads if not given)
-
- * `keepAll` - Flag to keep intermediary files (defaults to off = 0)
-
+ - `address` - Email to send an email to when done (relies on sendmail). If not present, email notifications are disabled
+ - `hook` - Slack webhook to send notification to when done. If not present, slack notifications are disabled.
+ - `maxThreads` - Maximum threads to use (defaults to system threads if not given)
+ - `keepAll` - Flag to keep intermediary files (defaults to off = 0)
 General settings files:
-
- * `geomegaSettings` - Defaults to system default (`~/geomega.cfg`)
-
- * `revanSettings` - Defaults to system default (`~/revan.cfg`)
-
- * `mimrecSettings` - Defaults to system default (`~/mimrec.cfg`)
+ - `geomegaSettings` - Defaults to system default (`~/geomega.cfg`)
+ - `revanSettings` - Defaults to system default (`~/revan.cfg`)
+ - `mimrecSettings` - Defaults to system default (`~/mimrec.cfg`)
 
 Standard parameter format:
 
@@ -438,36 +423,20 @@ If there are three values, then the parameter starts at the first value and incr
 If the array is a double array of values, those are taken as the literal values of the parameter.
 
 Cosima settings:
-
- * `filename` - Base cosima .source file
-
- * `parameters` - Array of parameters, formatted as such:
-
-    * `source` - Name of the source to modify
-
-    * `beam` - Beam settings: Array of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
-
-    * `spectrum` - Spectrum settings: Array of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
-
-    * `flux` - Array of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
-
-    * `polarization` - Polarization settings: Array of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
+ - `filename` - Base cosima .source file
+ - `parameters` - Array of parameters, formatted as such:
+    - `source` - Name of the source to modify
+    - `beam` - Beam settings: Array of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
+    - `spectrum` - Spectrum settings: Array of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
+    - `flux` - Array of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
+    - `polarization` - Polarization settings: Array of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
 
 Geomega settings:
-
- * `filename` - Base cosima .source file
-
- * `parameters` - Array of parameters, formatted as such:
-
-    * `filename` - Filename of the file to modify
-
-    * `line number` - line number of the file to modify
-
-    * `contents` - Contents of the line. Array of values(including strings) in the standard format, to be separated by spaces in the file.
-
-Mimrec settings:
-
- * Incomplete.
+ - `filename` - Base cosima .source file
+ - `parameters` - Array of parameters, formatted as such:
+    - `filename` - Filename of the file to modify
+    - `line number` - line number of the file to modify
+    - `contents` - Contents of the line. Array of values(including strings) in the standard format, to be separated by spaces in the file.
 
 ### Notes:
 
