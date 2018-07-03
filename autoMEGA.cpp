@@ -13,19 +13,17 @@ using namespace std;
 
 // Default values for all arguments. Strings cannot be atomic, but they should only be read by threads, so there shouldnt be a problem.
 
-/// Yaml comfig file for the simulation
+/// Yaml config file for the simulation
 string settings = "config.yaml";
-/// Geomega settings file (defaults to geomega default)
-string geomegaSettings = "~/.geomega.cfg";
 /// Revan settings file (defaults to revan default)
 string revanSettings = "~/.revan.cfg";
 /// Slack hook (if empty, slack notifications are disabled)
 string hook = "";
 /// Email address for notifications (if empty, email notifications are disabled)
 string address = "";
-/// Maximum threads to use for simulations
+/// Maximum threads to use for simulations (defaults to system thread count)
 int maxThreads = (std::thread::hardware_concurrency()==0)?4:std::thread::hardware_concurrency(); // If it cannot detect the number of threads, default to 4
-/// File to which simulation settings are logged
+/// Legend file
 ofstream legend;
 /// Mutex to make sure only one thing is writing to legend at a time
 mutex legendLock;
@@ -50,8 +48,6 @@ atomic<bool> keepAll(false);
  Values are assumed as doubles if they are in three element format, otherwise they are assumed as strings.
 */
 vector<string> parseIterativeNode(YAML::Node contents, std::string prepend=""){
-    // if(test) cout << contents << endl;
-
     vector<string> options; options.push_back(prepend);
     vector<string> newOptions;
     for(size_t i=0;i<contents.size();i++){
@@ -69,11 +65,6 @@ vector<string> parseIterativeNode(YAML::Node contents, std::string prepend=""){
         options.clear();
         options = std::move(newOptions);
     }
-
-    // if(test){
-        // for(auto o : options) cout << o << endl;
-        // cout << endl;
-    // }
     return options;
 }
 
@@ -90,20 +81,25 @@ vector<string> parseIterativeNode(YAML::Node contents, std::string prepend=""){
 int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
     if(recursionDepth>1024){
         cerr << "Exceeded max recursion depth of 1024. This is likely due to a curcular dependency. If not, then your geometry is way to complex. Exiting." << endl;
-        slack("GEOMERGE: Exceeded max recursion depth of 1024. This is likely due to a curcular dependency. If not, then your geometry is way to complex. Exiting.",hook);
+        if(!hook.empty()) slack("GEOMERGE: Exceeded max recursion depth of 1024. This is likely due to a curcular dependency. If not, then your geometry is way to complex. Exiting.",hook);
         return -1;
     }
-    if(recursionDepth==0) out << "///Include " << inputFile << "\n";
+    if(recursionDepth==0) out << "///Include " << inputFile << "\n"; // Note initial file
 
+    // Open file
     ifstream input(inputFile);
     if(!input.is_open() || !input.good()){
         cerr << "Could not open included file \"" << inputFile << "\"." << endl;
-        slack("GEOMERGE: Could not open included file \"" + inputFile + "\".",hook);
+        if(!hook.empty()) slack("GEOMERGE: Could not open included file \"" + inputFile + "\".",hook);
         return 1;
     }
+
+    // Loop over file
     for(string line;getline(input,line);){
         stringstream ss(line);
         string command; ss >> command;
+
+        //  Include other files
         if(command=="Include"){
             out << "///" << line << "\n";
             string includedFile; ss >> includedFile;
@@ -138,7 +134,7 @@ int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
 int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
     // Merge all files together
     ofstream baseGeometry("g.geo.setup");
-    if(!baseGeometry.is_open()){ cerr << "Could not create new base geometry file. Exiting" << endl; slack("GEOMEGA SETUP: Could not create new base geometry file. Exiting.",hook); return 3;}
+    if(!baseGeometry.is_open()){ cerr << "Could not create new base geometry file. Exiting" << endl; if(!hook.empty()) slack("GEOMEGA SETUP: Could not create new base geometry file. Exiting.",hook); return 3;}
     if(geoMerge(geomega["filename"].as<string>(),baseGeometry)) return 1;
     baseGeometry.close();
 
@@ -193,7 +189,6 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
                         getline(alteredGeometry,line);
                         newGeometry << line << "\n";
 
-                        // Check we havent passed "///End "+files[i]
                         stringstream newLine(line);
                         string command,file; newLine >> command >> file;
                         // Skip over other includes
@@ -201,16 +196,19 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
                             while(getline(alteredGeometry,line)){
                                 newGeometry << line << "\n";
                                 if(line=="///End "+files[i]){
-                                    cerr << "Attempted to alter line number past end of file." << endl;
-                                    slack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i],hook);
-                                    if(!test){ cerr << "Exiting." << endl; return 4;}
+                                    cerr << "Attempted to alter line number past end of file. File: \""+files[i]+"\". Exiting." << endl;
+                                    if(!hook.empty()) slack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i],hook);
+                                    return 4;
                                 }
+                                // Check we havent passed "///End "+files[i]
                                 if(line=="///End "+file) break;
                             }
                         }
+                        // Check we havent passed "///End "+files[i]
                         if(line=="///End "+files[i]){
-                            slack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i],hook);
-                            if(!test){ cerr << "Exiting." << endl; return 4;}
+                            cerr << "Attempted to alter line number past end of file. File: \""+files[i]+"\". Exiting." << endl;
+                            if(!hook.empty()) slack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i],hook);
+                            return 4;
                         }
                     }
 
@@ -244,9 +242,9 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
         legendLock.unlock();
     } else geometries.push_back("g.geo.setup");
 
-    // Verify all geometries
+    // Verify all geometries TODO: link this with geomega directly instead of with bash call
     if(!test) for(size_t i=0;i<geometries.size();i++){
-        bash("geomega -f "+geometries[i]+" --check-geometry > geomega.run"+to_string(i)+".out"); // TODO: Remove requirement for altered geomega
+        bash("geomega -f "+geometries[i]+" --check-geometry > geomega.run"+to_string(i)+".out");
         ifstream overlapCheck("geomega.run"+to_string(i)+".out");
         bool check0=0,check1=0;
         if(overlapCheck.is_open()) for(string line;getline(overlapCheck,line);){
@@ -255,7 +253,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
         }
         if(!(check0&&check1)){
             cerr << "GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list." << endl;
-            slack("GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list.",hook);
+            if(!hook.empty()) slack("GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list.",hook);
             geometries.erase(geometries.begin()+i--);
         }
     } else for(size_t i=0;i<geometries.size();i++) cout << "geomega -f "+geometries[i]+" --check-geometry | tee geomega.run"+to_string(i)+".out" << endl;
@@ -282,9 +280,9 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
 int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geometries){
     string baseFileName = cosima["filename"].as<string>();
     // Make sure config file exists
-    if(bash("cat "+baseFileName+">/dev/null")){
+    if(bash("cat "+baseFileName+">/dev/null")){ // TODO: use other calls to avoid bash
         cerr << "File \"" << baseFileName << "\" does not exist, but was requested. Exiting."<< endl;
-        slack("COSIMA SETUP: File \"" + baseFileName + "\" does not exist, but was requested. Exiting.",hook);
+        if(!hook.empty()) slack("COSIMA SETUP: File \"" + baseFileName + "\" does not exist, but was requested. Exiting.",hook);
         return 1;
     }
 
@@ -342,16 +340,16 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
 }
 
 /**
- @brief Run one simulation and analysis (cosima, revan) (incomplete)
+ @brief Runs the Cosima simulation and Revan data reduction for one set of parameters
 
- ## Run one simulation and analysis (cosima, revan) (incomplete)
+ ##  Runs the Cosima simulation and Revan data reduction for one set of parameters
 
  ### Arguments
  - `const string source` - *.source file for cosima
  - `const int threadNumber` - Thread number to avoid file name collisions
 
  ### Notes
- Incomplete - Currently only runs revan and cosima, and often runs out of storage...
+ Often runs out of storage if you are not careful
 
 */
 void runSimulation(const string source, const int threadNumber){
@@ -369,12 +367,13 @@ void runSimulation(const string source, const int threadNumber){
     ifstream sourceFile(source);
     string geoSetup;
     while(!sourceFile.eof() && geoSetup!="Geometry") sourceFile>>geoSetup;
-    if(geoSetup!="Geometry"){cerr << "Cannot locate geometry file. Exiting." << endl; slack("RUN SIMULATION"+to_string(threadNumber)+": Cannot locate geometry file.",hook); return;}
+    if(geoSetup!="Geometry"){cerr << "Cannot locate geometry file. Exiting." << endl; if(!hook.empty()) slack("RUN SIMULATION"+to_string(threadNumber)+": Cannot locate geometry file.",hook); return;}
     sourceFile>>geoSetup;
     sourceFile.close();
 
     // Actually run simulation and analysis
-    // Remove intermediary files when they are no longer necesary (unless keepAll is set)
+    // Remove intermediary files when they are no longer necessary (unless keepAll is set)
+    // TODO: replace bash calls with MEGAlib integrations and filesystem calls
     if(!test){
         bash("cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz");
         bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".*.sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz");
@@ -397,7 +396,7 @@ void runSimulation(const string source, const int threadNumber){
 ### Arguments:
 
  - `--settings` - Settings file - defaults to "config.yaml"
- - `--test` - Enter test mode. Largely undefined behavior, but it will generally perform a dry run. Use at your own risk, it may break everything.
+ - `--test` - Enter test mode. Largely undefined behavior, but it will generally perform a dry run and limit slack notifications. Use at your own risk.
 
 ### Configuration:
 Most settings are only configurable from the yaml configuration file. The format is:
@@ -429,7 +428,7 @@ Cosima settings:
     - `polarization` - Polarization settings: Array of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).
 
 Geomega settings:
- - `filename` - Base cosima .source file
+ - `filename` - Base geomega .geo.setup file
  - `parameters` - Array of parameters, formatted as such:
     - `filename` - Filename of the file to modify
     - `line number` - line number of the file to modify
@@ -440,16 +439,6 @@ Geomega settings:
 To compile, use `g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -g -lcurl -lyaml-cpp -Ofast -Wall -o autoMEGA`
 
 You may also have to precompile pipeliningTools first. See that repo for instructions.
-
-TODO:
-
-- Single analysis
-
-- Overall analysis
-
-- Improvement: YAML Cosima and geomega legends
-
-- Improvement: linked parsing
 
 */
 int main(int argc,char** argv){
@@ -462,14 +451,14 @@ int main(int argc,char** argv){
     }
 
     // Make sure config file exists
-    if(bash("cat "+settings+">/dev/null")){
+    if(bash("cat "+settings+">/dev/null")){ // TODO: Use filesystem calls instead of bash.
         cerr << "File \"" << settings << "\" does not exist, but was requested. Exiting."<< endl;
-        slack("MAIN: File \"" + settings + "\" does not exist, but was requested. Exiting.",hook);
+        if(!hook.empty()) slack("MAIN: File \"" + settings + "\" does not exist, but was requested. Exiting.",hook);
         return 1;
     }
 
     // Check directory
-    if(!test && directoryEmpty(".")) return 3; // Make sure its empty
+    if(directoryEmpty(".")) return 3; // Make sure its empty TODO: remove bash dependence
 
     // Parse config file
     YAML::Node config = YAML::LoadFile(settings);
@@ -483,17 +472,14 @@ int main(int argc,char** argv){
 
     vector<string> geometries;
     if(config["geomega"]) if(geomegaSetup(config["geomega"],geometries)!=0) return 2;
-    if(test) for(auto&s:geometries)cout << s << endl;
 
     vector<string> sources;
     if(config["cosima"]) if(cosimaSetup(config["cosima"],sources,geometries)!=0) return 3;
-    if(test) for(auto&s:sources)cout << s << endl;
 
     cout << "Using " << maxThreads << " threads." << endl;
 
     // Start watchdog thread(s)
     thread watchdog0(storageWatchdog,2000);
-    // thread watchdog1(memoryWatchdog,0.1);
 
     // Create threadpool
     vector<thread> threadpool;
@@ -512,15 +498,11 @@ int main(int argc,char** argv){
     for(size_t i=0;i<threadpool.size();i++) threadpool[i].join();
     legend.close();
 
-    // TODO: Gather data from each simulation output and use it to make a plot of something
-
     // End timer, print command duration
     auto end = chrono::steady_clock::now();
     cout << endl << "Total simulation and analysis elapsed time: " << beautify_duration(chrono::duration_cast<chrono::seconds>(end-start)) << endl;
-    if(!test){
-        if(!hook.empty()) slack("Simulation complete",hook);
-        if(!address.empty()) email(address,"Simulation Complete");
-    }
+    if(!hook.empty()) slack("Simulation complete",hook);
+    if(!address.empty()) email(address,"Simulation Complete"); // TODO: remove bash dependence
     exitFlag=1;
     watchdog0.join();
     return 0;

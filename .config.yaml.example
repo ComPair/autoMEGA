@@ -4,7 +4,6 @@
   maxThreads: 24
   keepAll: false
 
-  geomegaSettings: "~/geomega.cfg"
   revanSettings: "~/revan.cfg"
 
   geomega:
