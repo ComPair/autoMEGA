@@ -407,7 +407,6 @@ autoMEGA settings:
  - `maxThreads` - Maximum threads to use (defaults to system threads if not given)
  - `keepAll` - Flag to keep intermediary files (defaults to off = 0)
 General settings files:
- - `geomegaSettings` - Defaults to system default (`~/geomega.cfg`)
  - `revanSettings` - Defaults to system default (`~/revan.cfg`)
 
 Standard parameter format:
@@ -467,7 +466,6 @@ int main(int argc,char** argv){
     if(config["maxThreads"]) maxThreads = config["maxThreads"].as<int>();
     if(config["keepAll"]) keepAll = config["keepAll"].as<bool>();
 
-    if(config["geomegaSettings"]) geomegaSettings = config["geomegaSettings"].as<string>();
     if(config["revanSettings"]) revanSettings = config["revanSettings"].as<string>();
 
     vector<string> geometries;
