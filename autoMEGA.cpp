@@ -495,6 +495,9 @@ int main(int argc,char** argv){
         return 1;
     }
 
+    // Check directory
+    if(!test && directoryEmpty(".")) return 3; // Make sure its empty
+
     // Parse config file
     YAML::Node config = YAML::LoadFile(settings);
     if(config["address"]) address = config["address"].as<string>();
@@ -518,8 +521,6 @@ int main(int argc,char** argv){
 
     cout << "Using " << maxThreads << " threads." << endl;
 
-    // Check directory
-    if(!test && directoryEmpty(".")) return 3; // Make sure its empty
 
     // Start watchdog thread(s)
     thread watchdog0(storageWatchdog,2000);
