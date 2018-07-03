@@ -19,8 +19,6 @@ string settings = "config.yaml";
 string geomegaSettings = "~/.geomega.cfg";
 /// Revan settings file (defaults to revan default)
 string revanSettings = "~/.revan.cfg";
-/// Mimrec settings file (defaults to mimrec default)
-string mimrecSettings = "~/.mimrec.cfg";
 /// Slack hook (if empty, slack notifications are disabled)
 string hook = "";
 /// Email address for notifications (if empty, email notifications are disabled)
@@ -344,9 +342,9 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
 }
 
 /**
- @brief Run one simulation and analysis (cosima, revan, mimrec) (incomplete)
+ @brief Run one simulation and analysis (cosima, revan) (incomplete)
 
- ## Run one simulation and analysis (cosima, revan, mimrec) (incomplete)
+ ## Run one simulation and analysis (cosima, revan) (incomplete)
 
  ### Arguments
  - `const string source` - *.source file for cosima
@@ -412,7 +410,6 @@ autoMEGA settings:
 General settings files:
  - `geomegaSettings` - Defaults to system default (`~/geomega.cfg`)
  - `revanSettings` - Defaults to system default (`~/revan.cfg`)
- - `mimrecSettings` - Defaults to system default (`~/mimrec.cfg`)
 
 Standard parameter format:
 
@@ -439,8 +436,6 @@ Geomega settings:
     - `contents` - Contents of the line. Array of values(including strings) in the standard format, to be separated by spaces in the file.
 
 ### Notes:
-
-To redirect stdout and stderr to a file and still view on command line, use `[autoMEGA command & arguments] 2>&1 | tee file.txt`, where `[autoMEGA command & arguments]` is the command and arguments, and `file.txt` is the desired output file.
 
 To compile, use `g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -g -lcurl -lyaml-cpp -Ofast -Wall -o autoMEGA`
 
@@ -485,7 +480,6 @@ int main(int argc,char** argv){
 
     if(config["geomegaSettings"]) geomegaSettings = config["geomegaSettings"].as<string>();
     if(config["revanSettings"]) revanSettings = config["revanSettings"].as<string>();
-    if(config["mimrecSettings"]) mimrecSettings = config["mimrecSettings"].as<string>();
 
     vector<string> geometries;
     if(config["geomega"]) if(geomegaSetup(config["geomega"],geometries)!=0) return 2;
@@ -494,8 +488,6 @@ int main(int argc,char** argv){
     vector<string> sources;
     if(config["cosima"]) if(cosimaSetup(config["cosima"],sources,geometries)!=0) return 3;
     if(test) for(auto&s:sources)cout << s << endl;
-
-    if(config["mimrec"]) ;
 
     cout << "Using " << maxThreads << " threads." << endl;
 

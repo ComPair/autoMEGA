@@ -6,7 +6,6 @@
 
   geomegaSettings: "~/geomega.cfg"
   revanSettings: "~/revan.cfg"
-  mimrecSettings: "~/mimrec.cfg"
 
   geomega:
     filename: "../Geometry/AMEGO_4x4TowerModel/AmegoBase.geo.setup"
