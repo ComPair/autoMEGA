@@ -7,6 +7,7 @@
 
 #include "pipeliningTools/pipeline.h"
 #include "yaml-cpp/yaml.h"
+#include <regex>
 
 using namespace std;
 
@@ -285,7 +286,7 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
         cerr << "File \"" << baseFileName << "\" does not exist, but was requested. Exiting."<< endl;
         return 1;
     }
-    
+
     // Parse iterative nodes, but need to specially format them with the correct source and name.
     map<string,vector<string>> options;
     for(size_t i=0;i<cosima["parameters"].size();i++){
@@ -330,7 +331,9 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
         string filename = "run"+to_string(i)+".source";
         sources.push_back(filename);
         ofstream out(filename);
-        out << alteredSources[i];
+        // Fix output filename
+        regex e(".FileName .*\n");
+        out << regex_replace(alteredSources[i],e,".FileName run"+to_string(i)+"\n");;
         out.close();
     }
 
@@ -375,11 +378,11 @@ void runSimulation(const string source, const int threadNumber){
     // Remove intermediary files when they are no longer necesary (unless keepAll is set)
     if(!test){
         bash("cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz");
-        bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".*.log");
+        bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz");
         if(!keepAll) bash("rm run"+to_string(threadNumber)+".*.sim.gz");
     }else{
         cout << "cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz\n";
-        cout << "revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".*.log\n";
+        cout << "revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz\n";
         if(!keepAll) cout << "rm run"+to_string(threadNumber)+".*.sim.gz\n";
     }
 
