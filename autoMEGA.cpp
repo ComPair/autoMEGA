@@ -386,11 +386,11 @@ void runSimulation(const string source, const int threadNumber){
     // Remove intermediary files when they are no longer necesary (unless keepAll is set)
     if(!test){
         bash("cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz");
-        bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz");
+        bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".*.sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz");
         if(!keepAll) bash("rm run"+to_string(threadNumber)+".*.sim.gz");
     }else{
         cout << "cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz\n";
-        cout << "revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz\n";
+        cout << "revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".*.sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz\n";
         if(!keepAll) cout << "rm run"+to_string(threadNumber)+".*.sim.gz\n";
     }
 
