@@ -93,6 +93,7 @@ vector<string> parseIterativeNode(YAML::Node contents, std::string prepend=""){
 int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
     if(recursionDepth>1024){
         cerr << "Exceeded max recursion depth of 1024. This is likely due to a curcular dependency. If not, then your geometry is way to complex. Exiting." << endl;
+        slack("GEOMERGE: Exceeded max recursion depth of 1024. This is likely due to a curcular dependency. If not, then your geometry is way to complex. Exiting.",hook);
         return -1;
     }
     if(recursionDepth==0) out << "///Include " << inputFile << "\n";
@@ -100,6 +101,7 @@ int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
     ifstream input(inputFile);
     if(!input.is_open() || !input.good()){
         cerr << "Could not open included file \"" << inputFile << "\"." << endl;
+        slack("GEOMERGE: Could not open included file \"" + inputFile + "\".",hook);
         return 1;
     }
     for(string line;getline(input,line);){
@@ -140,7 +142,7 @@ int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
 int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
     // Merge all files together
     ofstream baseGeometry("g.geo.setup");
-    if(!baseGeometry.is_open()){ cerr << "Could not create new base geometry file. Exiting" << endl; return 3;}
+    if(!baseGeometry.is_open()){ cerr << "Could not create new base geometry file. Exiting" << endl; slack("GEOMEGA SETUP: Could not create new base geometry file. Exiting.",hook); return 3;}
     if(geoMerge(geomega["filename"].as<string>(),baseGeometry)) return 1;
     baseGeometry.close();
 
@@ -204,13 +206,14 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
                                 newGeometry << line << "\n";
                                 if(line=="///End "+files[i]){
                                     cerr << "Attempted to alter line number past end of file." << endl;
+                                    slack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i],hook);
                                     if(!test){ cerr << "Exiting." << endl; return 4;}
                                 }
                                 if(line=="///End "+file) break;
                             }
                         }
                         if(line=="///End "+files[i]){
-                            cerr << "Attempted to alter line number past end of file." << endl;
+                            slack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i],hook);
                             if(!test){ cerr << "Exiting." << endl; return 4;}
                         }
                     }
@@ -247,15 +250,18 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
 
     // Verify all geometries
     if(!test) for(size_t i=0;i<geometries.size();i++){
-        bash("geomega -f "+geometries[i]+" --check-geometry | tee geomega.run"+to_string(i)+".out");
+        bash("geomega -f "+geometries[i]+" --check-geometry > geomega.run"+to_string(i)+".out"); // TODO: Remove requirement for altered geomega
         ifstream overlapCheck("geomega.run"+to_string(i)+".out");
         bool check0=0,check1=0;
         if(overlapCheck.is_open()) for(string line;getline(overlapCheck,line);){
             if(line=="No extrusions and overlaps detected with ROOT (ROOT claims to be able to detect 95% of them)") check0=1;
             if(line=="-------- Cosima output start --------" && (getline(overlapCheck,line) || line=="-------- Cosima output stop ---------")) check1=1;
         }
-        if(!(check0&&check1)){cerr << "Geometry error. Exiting." << endl; return 2;}
-        if(!keepAll) bash("rm geomega.run"+to_string(i)+".out");
+        if(!(check0&&check1)){
+            cerr << "GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list." << endl;
+            slack("GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list.",hook);
+            geometries.erase(geometries.begin()+i--);
+        }
     } else for(size_t i=0;i<geometries.size();i++) cout << "geomega -f "+geometries[i]+" --check-geometry | tee geomega.run"+to_string(i)+".out" << endl;
 
     return 0;
@@ -284,6 +290,7 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
     // Make sure config file exists
     if(bash("cat "+baseFileName+">/dev/null")){
         cerr << "File \"" << baseFileName << "\" does not exist, but was requested. Exiting."<< endl;
+        slack("COSIMA SETUP: File \"" + baseFileName + "\" does not exist, but was requested. Exiting.",hook);
         return 1;
     }
 
@@ -357,6 +364,7 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
 void runSimulation(const string source, const int threadNumber){
     if(!test) slack("Starting run "+to_string(threadNumber),hook);
 
+    // Get seed
     uint32_t seed = random_seed<uint32_t>();
 
     // Create legend
@@ -370,7 +378,7 @@ void runSimulation(const string source, const int threadNumber){
     ifstream sourceFile(source);
     string geoSetup;
     while(!sourceFile.eof() && geoSetup!="Geometry") sourceFile>>geoSetup;
-    if(geoSetup!="Geometry"){cerr << "Cannot locate geometry file. Exiting." << endl; return;}
+    if(geoSetup!="Geometry"){cerr << "Cannot locate geometry file. Exiting." << endl; slack("RUN SIMULATION"+to_string(threadNumber)+": Cannot locate geometry file.",hook); return;}
     sourceFile>>geoSetup;
     sourceFile.close();
 
@@ -405,9 +413,9 @@ void runSimulation(const string source, const int threadNumber){
 Most settings are only configurable from the yaml configuration file. The format is:
 
 autoMEGA settings:
- * `address` - Email to send an email to when done (relies on sendmail)
+ * `address` - Email to send an email to when done (relies on sendmail). If not present, email notifications are disabled
 
- * `hook` - Slack webhook to send notification to when done
+ * `hook` - Slack webhook to send notification to when done. If not present, slack notifications are disabled.
 
  * `maxThreads` - Maximum threads to use (defaults to system threads if not given)
 
@@ -492,6 +500,7 @@ int main(int argc,char** argv){
     // Make sure config file exists
     if(bash("cat "+settings+">/dev/null")){
         cerr << "File \"" << settings << "\" does not exist, but was requested. Exiting."<< endl;
+        slack("MAIN: File \"" + settings + "\" does not exist, but was requested. Exiting.",hook);
         return 1;
     }
 
@@ -520,7 +529,6 @@ int main(int argc,char** argv){
     if(config["mimrec"]) ;
 
     cout << "Using " << maxThreads << " threads." << endl;
-
 
     // Start watchdog thread(s)
     thread watchdog0(storageWatchdog,2000);
