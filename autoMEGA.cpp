@@ -258,7 +258,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
             if(!hook.empty()) slack("GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list.",hook);
             geometries.erase(geometries.begin()+i--);
         }
-    } else for(size_t i=0;i<geometries.size();i++) cout << "geomega -f "+geometries[i]+" --check-geometry | tee geomega.run"+to_string(i)+".out" << endl;
+    } else for(size_t i=0;i<geometries.size();i++) cout << "geomega -f "+geometries[i]+" --check-geometry > geomega.run"+to_string(i)+".out" << endl;
 
     return 0;
 }
@@ -375,7 +375,7 @@ void runSimulation(const string source, const int threadNumber){
 
     // Actually run simulation and analysis
     // Remove intermediary files when they are no longer necessary (unless keepAll is set)
-    // TODO: replace bash calls with MEGAlib integrations and filesystem calls
+    // TODO: replace bash calls with MEGAlib integrations
     if(!test){
         bash("cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz");
         bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".*.sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz");
