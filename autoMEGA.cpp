@@ -8,6 +8,8 @@
 #include "pipeliningTools/pipeline.h"
 #include "yaml-cpp/yaml.h"
 #include <regex>
+#include <filesystem>
+#include <glob.h>
 
 using namespace std;
 
@@ -280,7 +282,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
 int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geometries){
     string baseFileName = cosima["filename"].as<string>();
     // Make sure config file exists
-    if(bash("cat "+baseFileName+">/dev/null")){ // TODO: use other calls to avoid bash
+    if(!fileExsists(baseFileName)){
         cerr << "File \"" << baseFileName << "\" does not exist, but was requested. Exiting."<< endl;
         if(!hook.empty()) slack("COSIMA SETUP: File \"" + baseFileName + "\" does not exist, but was requested. Exiting.",hook);
         return 1;
@@ -377,7 +379,7 @@ void runSimulation(const string source, const int threadNumber){
     if(!test){
         bash("cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz");
         bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".*.sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz");
-        if(!keepAll) bash("rm run"+to_string(threadNumber)+".*.sim.gz");
+        if(!keepAll) removeWildcard("run"+to_string(threadNumber)+".*.sim.gz");
     }else{
         cout << "cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz\n";
         cout << "revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".*.sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz\n";
@@ -388,6 +390,41 @@ void runSimulation(const string source, const int threadNumber){
     currentThreadCount--;
     if(!test && !hook.empty()) slack("Run "+to_string(threadNumber)+" complete.", hook);
     return;
+}
+
+/**
+@brief Check if directory is empty using C++17's filesystem instead of system calls
+
+  ## Check run directory for filesusing C++17's filesystem instead of system calls
+
+  ### Arguments:
+  * `string dir` - Directory to check if running in.
+
+  ### Notes:
+  If the directory is empty, zero is returned. Otherwise it prompts the user for how they want to procede. Returns 0 if they want to procede and 1 otherwise.
+*/
+bool filesystemEmpty(std::string dir){
+    filesystem::path directory = dir;
+    if(filesystem::is_empty(directory)) return 0;
+    while(1){
+        std::cout << "Directory not empty. Press c then enter to clean, press s then enter to skip, or press e then enter to exit." << std::endl;
+        std::string input;
+        std::cin >> input;
+        if(input[0]=='c'||input[0]=='C'){
+            std::cout << "Cleaning directory." << std::endl;
+            for (auto & p : filesystem::directory_iterator(directory)) filesystem::remove(p);
+            return 0;
+        }
+        if(input[0]=='s'||input[0]=='S'){
+            std::cout << "Skipping clean directory." << std::endl;
+            return 0;
+        }
+        if(input[0]=='e'||input[0]=='E'){
+            std::cout << "Exiting." << std::endl;
+            return 1;
+        }
+        std::cout << "Error. ";
+    }
 }
 
 /**
@@ -402,7 +439,7 @@ void runSimulation(const string source, const int threadNumber){
 Most settings are only configurable from the yaml configuration file. The format is:
 
 autoMEGA settings:
- - `address` - Email to send an email to when done (relies on sendmail). If not present, email notifications are disabled
+ - `address` - Email to send an email to when done (relies on sendmail). If not present, email notifications are disabled. Note: depends on a system call to sendmail, so it may not work on all systems.
  - `hook` - Slack webhook to send notification to when done. If not present, slack notifications are disabled.
  - `maxThreads` - Maximum threads to use (defaults to system threads if not given)
  - `keepAll` - Flag to keep intermediary files (defaults to off = 0)
@@ -435,7 +472,7 @@ Geomega settings:
 
 ### Notes:
 
-To compile, use `g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -g -lcurl -lyaml-cpp -Ofast -Wall -o autoMEGA`
+To compile, use `g++ autoMEGA.cpp -std=c++17 -lX11 -lXtst -pthread -ldl -ldw -g -lcurl -lyaml-cpp -Ofast -Wall -lstdc++fs -o autoMEGA`
 
 You may also have to precompile pipeliningTools first. See that repo for instructions.
 
@@ -450,14 +487,14 @@ int main(int argc,char** argv){
     }
 
     // Make sure config file exists
-    if(bash("cat "+settings+">/dev/null")){ // TODO: Use filesystem calls instead of bash.
+    if(!fileExsists(settings)){
         cerr << "File \"" << settings << "\" does not exist, but was requested. Exiting."<< endl;
         if(!hook.empty()) slack("MAIN: File \"" + settings + "\" does not exist, but was requested. Exiting.",hook);
         return 1;
     }
 
     // Check directory
-    if(directoryEmpty(".")) return 3; // Make sure its empty TODO: remove bash dependence
+    if(filesystemEmpty(".")) return 3;
 
     // Parse config file
     YAML::Node config = YAML::LoadFile(settings);
@@ -500,7 +537,7 @@ int main(int argc,char** argv){
     auto end = chrono::steady_clock::now();
     cout << endl << "Total simulation and analysis elapsed time: " << beautify_duration(chrono::duration_cast<chrono::seconds>(end-start)) << endl;
     if(!hook.empty()) slack("Simulation complete",hook);
-    if(!address.empty()) email(address,"Simulation Complete"); // TODO: remove bash dependence
+    if(!address.empty()) email(address,"Simulation Complete");
     exitFlag=1;
     watchdog0.join();
     return 0;

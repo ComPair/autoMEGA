@@ -10,7 +10,7 @@ You will need to recursively initiate git modules to compile.
 
 Depends on yaml-cpp and pipeliningTools.
 
-To compile: `g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -o autoMEGA`
+To compile: `g++ autoMEGA.cpp -std=c++17 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -lstdc++fs -o autoMEGA`
 
 Go to [Gitlab pages](https://cbray.gitlab.io/autoMEGA/autoMEGA_8cpp.html) for full documentation.
 
