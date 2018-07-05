@@ -10,7 +10,6 @@
 #include <regex>
 #include <filesystem>
 #include <glob.h>
-#include "MInterfaceGeomega.h"
 
 using namespace std;
 
@@ -36,46 +35,6 @@ atomic<int> currentThreadCount(0);
 atomic<int> test(0);
 /// Bool to indicate what files to keep (false = keep no intermediary files, true = keep all)
 atomic<bool> keepAll(false);
-
-
-class aMInterfaceGeomega : public MInterfaceGeomega{ // Code is largely a duplicate of code by Andreas Zoglauer, but modified to automate more easily
-public:
-    bool SetGeometry(MString FileName, bool UpdateGui = true){
-        if (m_Data->SetCurrentFileName(FileName) == false) {
-            cerr<<"Error loading Geometry"<<std::endl;
-            return false;
-        }
-        return true;
-    }
-
-    bool TestIntersections(std::string outputFile){
-        if(!ReadGeometry()) return false;
-        bool rootTest = m_Geometry->CheckOverlaps();
-        if(!rootTest) return false;
-
-        if(!fileExists(g_MEGAlibPath + "/bin/cosima")) {
-          cerr << "Cannot find Cosima." << std::endl;
-        }
-
-        ofstream out;
-        MString FileName = gSystem->TempDirectory();
-        FileName += "/DelMe.source";
-        out.open(FileName);
-        if(!out.is_open()) {
-          cerr << "Could not open temp file." << std::endl;
-          return false;
-        }
-        out<<"Version 1\nGeometry "<<m_Data->GetCurrentFileName()<<"\nCheckForOverlaps 10000 0.0001\nPhysicsListEM Standard\nRun Minimum\nMinimum.FileName DelMe\nMinimum.NEvents 1\nMinimum.Source MinimumS\nMinimumS.ParticleType 1\nMinimumS.Position 1 1 0 0 \nMinimumS.SpectralType 1\nMinimumS.Energy 10\nMinimumS.Intensity 1"<<endl;
-        out.close();
-
-        MString WorkingDirectory = gSystem->WorkingDirectory();
-        gSystem->ChangeDirectory(gSystem->TempDirectory());
-        gSystem->Exec(MString("bash -c \"source ${MEGALIB}/bin/source-megalib.sh; cosima ") + FileName + MString(" 2>&1 | grep \"WARNING\" -A 3\" &> ") + MString(outputFile));
-        gSystem->Exec(MString("rm -f DelMe.*.sim ") + FileName);
-        gSystem->ChangeDirectory(WorkingDirectory);
-        return std::filesystem::is_empty(path(outputFile));
-    }
-};
 
 /**
  @brief Parse iterative nodes in list or pattern mode
@@ -123,7 +82,7 @@ vector<string> parseIterativeNode(YAML::Node contents, std::string prepend=""){
 */
 int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
     if(recursionDepth>1024){
-        cerr << "Exceeded max recursion depth of 1024. This is likely due to a curcular dependency. If not, then your geometry is way to complex. Exiting." << std::endl;
+        cerr << "Exceeded max recursion depth of 1024. This is likely due to a curcular dependency. If not, then your geometry is way to complex. Exiting." << endl;
         if(!hook.empty()) slack("GEOMERGE: Exceeded max recursion depth of 1024. This is likely due to a curcular dependency. If not, then your geometry is way to complex. Exiting.",hook);
         return -1;
     }
@@ -132,7 +91,7 @@ int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
     // Open file
     ifstream input(inputFile);
     if(!input.is_open() || !input.good()){
-        cerr << "Could not open included file \"" << inputFile << "\"." << std::endl;
+        cerr << "Could not open included file \"" << inputFile << "\"." << endl;
         if(!hook.empty()) slack("GEOMERGE: Could not open included file \"" + inputFile + "\".",hook);
         return 1;
     }
@@ -177,7 +136,7 @@ int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
 int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
     // Merge all files together
     ofstream baseGeometry("g.geo.setup");
-    if(!baseGeometry.is_open()){ cerr << "Could not create new base geometry file. Exiting" << std::endl; if(!hook.empty()) slack("GEOMEGA SETUP: Could not create new base geometry file. Exiting.",hook); return 3;}
+    if(!baseGeometry.is_open()){ cerr << "Could not create new base geometry file. Exiting" << endl; if(!hook.empty()) slack("GEOMEGA SETUP: Could not create new base geometry file. Exiting.",hook); return 3;}
     if(geoMerge(geomega["filename"].as<string>(),baseGeometry)) return 1;
     baseGeometry.close();
 
@@ -239,7 +198,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
                             while(getline(alteredGeometry,line)){
                                 newGeometry << line << "\n";
                                 if(line=="///End "+files[i]){
-                                    cerr << "Attempted to alter line number past end of file. File: \""+files[i]+"\". Exiting." << std::endl;
+                                    cerr << "Attempted to alter line number past end of file. File: \""+files[i]+"\". Exiting." << endl;
                                     if(!hook.empty()) slack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i],hook);
                                     return 4;
                                 }
@@ -249,7 +208,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
                         }
                         // Check we havent passed "///End "+files[i]
                         if(line=="///End "+files[i]){
-                            cerr << "Attempted to alter line number past end of file. File: \""+files[i]+"\". Exiting." << std::endl;
+                            cerr << "Attempted to alter line number past end of file. File: \""+files[i]+"\". Exiting." << endl;
                             if(!hook.empty()) slack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i],hook);
                             return 4;
                         }
@@ -295,11 +254,11 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
             if(line=="-------- Cosima output start --------" && (getline(overlapCheck,line) || line=="-------- Cosima output stop ---------")) check1=1;
         }
         if(!(check0&&check1)){
-            cerr << "GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list." << std::endl;
+            cerr << "GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list." << endl;
             if(!hook.empty()) slack("GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list.",hook);
             geometries.erase(geometries.begin()+i--);
         }
-    } else for(size_t i=0;i<geometries.size();i++) cout << "geomega -f "+geometries[i]+" --check-geometry > geomega.run"+to_string(i)+".out" << std::endl;
+    } else for(size_t i=0;i<geometries.size();i++) cout << "geomega -f "+geometries[i]+" --check-geometry | tee geomega.run"+to_string(i)+".out" << endl;
 
     return 0;
 }
@@ -323,8 +282,8 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
 int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geometries){
     string baseFileName = cosima["filename"].as<string>();
     // Make sure config file exists
-    if(!fileExists(baseFileName)){
-        cerr << "File \"" << baseFileName << "\" does not exist, but was requested. Exiting."<< std::endl;
+    if(!fileExsists(baseFileName)){
+        cerr << "File \"" << baseFileName << "\" does not exist, but was requested. Exiting."<< endl;
         if(!hook.empty()) slack("COSIMA SETUP: File \"" + baseFileName + "\" does not exist, but was requested. Exiting.",hook);
         return 1;
     }
@@ -403,20 +362,20 @@ void runSimulation(const string source, const int threadNumber){
     legendLock.lock();
     legend << "Run number " << threadNumber << ":";
     legend << "\nSource: " << source;
-    legend << "\nSeed:" << to_string(seed) << "\n" << std::endl;
+    legend << "\nSeed:" << to_string(seed) << "\n" << endl;
     legendLock.unlock();
 
     // Get geometry file
     ifstream sourceFile(source);
     string geoSetup;
     while(!sourceFile.eof() && geoSetup!="Geometry") sourceFile>>geoSetup;
-    if(geoSetup!="Geometry"){cerr << "Cannot locate geometry file. Exiting." << std::endl; if(!hook.empty()) slack("RUN SIMULATION"+to_string(threadNumber)+": Cannot locate geometry file.",hook); return;}
+    if(geoSetup!="Geometry"){cerr << "Cannot locate geometry file. Exiting." << endl; if(!hook.empty()) slack("RUN SIMULATION"+to_string(threadNumber)+": Cannot locate geometry file.",hook); return;}
     sourceFile>>geoSetup;
     sourceFile.close();
 
     // Actually run simulation and analysis
     // Remove intermediary files when they are no longer necessary (unless keepAll is set)
-    // TODO: replace bash calls with MEGAlib integrations
+    // TODO: replace bash calls with MEGAlib integrations and filesystem calls
     if(!test){
         bash("cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz");
         bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".*.sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz");
@@ -528,8 +487,8 @@ int main(int argc,char** argv){
     }
 
     // Make sure config file exists
-    if(!fileExists(settings)){
-        cerr << "File \"" << settings << "\" does not exist, but was requested. Exiting."<< std::endl;
+    if(!fileExsists(settings)){
+        cerr << "File \"" << settings << "\" does not exist, but was requested. Exiting."<< endl;
         if(!hook.empty()) slack("MAIN: File \"" + settings + "\" does not exist, but was requested. Exiting.",hook);
         return 1;
     }
@@ -552,7 +511,7 @@ int main(int argc,char** argv){
     vector<string> sources;
     if(config["cosima"]) if(cosimaSetup(config["cosima"],sources,geometries)!=0) return 3;
 
-    cout << "Using " << maxThreads << " threads." << std::endl;
+    cout << "Using " << maxThreads << " threads." << endl;
 
     // Start watchdog thread(s)
     thread watchdog0(storageWatchdog,2000);
@@ -562,7 +521,7 @@ int main(int argc,char** argv){
     legend.open("run.legend");
 
     // Calculate total number of simulations
-    cout << sources.size() << " total simulations." << std::endl;
+    cout << sources.size() << " total simulations." << endl;
 
     // Start all simulation threads.
     for(size_t i=0;i<sources.size();i++){
@@ -576,7 +535,7 @@ int main(int argc,char** argv){
 
     // End timer, print command duration
     auto end = chrono::steady_clock::now();
-    cout << std::endl << "Total simulation and analysis elapsed time: " << beautify_duration(chrono::duration_cast<chrono::seconds>(end-start)) << std::endl;
+    cout << endl << "Total simulation and analysis elapsed time: " << beautify_duration(chrono::duration_cast<chrono::seconds>(end-start)) << endl;
     if(!hook.empty()) slack("Simulation complete",hook);
     if(!address.empty()) email(address,"Simulation Complete");
     exitFlag=1;
