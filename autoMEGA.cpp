@@ -282,7 +282,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
 int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geometries){
     string baseFileName = cosima["filename"].as<string>();
     // Make sure config file exists
-    if(!fileExsists(baseFileName)){
+    if(!fileExists(baseFileName)){
         cerr << "File \"" << baseFileName << "\" does not exist, but was requested. Exiting."<< endl;
         if(!hook.empty()) slack("COSIMA SETUP: File \"" + baseFileName + "\" does not exist, but was requested. Exiting.",hook);
         return 1;
@@ -487,7 +487,7 @@ int main(int argc,char** argv){
     }
 
     // Make sure config file exists
-    if(!fileExsists(settings)){
+    if(!fileExists(settings)){
         cerr << "File \"" << settings << "\" does not exist, but was requested. Exiting."<< endl;
         if(!hook.empty()) slack("MAIN: File \"" + settings + "\" does not exist, but was requested. Exiting.",hook);
         return 1;
