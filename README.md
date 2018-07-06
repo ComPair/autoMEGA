@@ -7,16 +7,17 @@ In-development library for automating MEGAlib simulations. The eventual goal is 
 The library is currently incomplete and completely untested.
 
 ### Dependencies:
+- MEGAlib
+- Sh shell links to bash (ubuntu default is dash, to fix use: `sudo ln -sf bash /bin/sh`)
 - YAML-cpp
 - pipeliningTools
-- C++17 (filesystem) - which means you have to use a g++ version from this year
 
 ### To compile:
 
 ```
 git submodule update --init --recursive --remote
 # Follow instructions to precompile pipeliningTools
-g++ autoMEGA.cpp -std=c++17 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -lstdc++fs -o autoMEGA
+g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -o autoMEGA
 ```
 
 Go to [Gitlab pages](https://cbray.gitlab.io/autoMEGA/autoMEGA_8cpp.html) for full documentation.

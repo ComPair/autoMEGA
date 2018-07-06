@@ -8,8 +8,6 @@
 #include "pipeliningTools/pipeline.h"
 #include "yaml-cpp/yaml.h"
 #include <regex>
-#include <filesystem>
-#include <glob.h>
 
 using namespace std;
 
@@ -246,7 +244,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
 
     // Verify all geometries TODO: link this with geomega directly instead of with bash call
     if(!test) for(size_t i=0;i<geometries.size();i++){
-        bash("geomega -f "+geometries[i]+" --check-geometry > geomega.run"+to_string(i)+".out");
+        bash("source ${MEGALIB}/bin/source-megalib.sh; geomega -f "+geometries[i]+" --check-geometry > geomega.run"+to_string(i)+".out");
         ifstream overlapCheck("geomega.run"+to_string(i)+".out");
         bool check0=0,check1=0;
         if(overlapCheck.is_open()) for(string line;getline(overlapCheck,line);){
@@ -258,7 +256,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
             if(!hook.empty()) slack("GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list.",hook);
             geometries.erase(geometries.begin()+i--);
         }
-    } else for(size_t i=0;i<geometries.size();i++) cout << "geomega -f "+geometries[i]+" --check-geometry | tee geomega.run"+to_string(i)+".out" << endl;
+    } else for(size_t i=0;i<geometries.size();i++) cout << "source ${MEGALIB}/bin/source-megalib.sh; geomega -f "+geometries[i]+" --check-geometry | tee geomega.run"+to_string(i)+".out" << endl;
 
     return 0;
 }
@@ -375,14 +373,13 @@ void runSimulation(const string source, const int threadNumber){
 
     // Actually run simulation and analysis
     // Remove intermediary files when they are no longer necessary (unless keepAll is set)
-    // TODO: replace bash calls with MEGAlib integrations and filesystem calls
     if(!test){
-        bash("cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz");
-        bash("revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".*.sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz");
+        system(("bash -c \"source ${MEGALIB}/bin/source-megalib.sh; cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz\"").c_str());
+        system(("bash -c \"source ${MEGALIB}/bin/source-megalib.sh; revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".*.sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz\"").c_str())
         if(!keepAll) removeWildcard("run"+to_string(threadNumber)+".*.sim.gz");
     }else{
-        cout << "cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz\n";
-        cout << "revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".*.sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz\n";
+        cout << "bash -c \"source ${MEGALIB}/bin/source-megalib.sh; cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz\"\n";
+        cout << "bash -c \"source ${MEGALIB}/bin/source-megalib.sh; revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".*.sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz\"\n";
         if(!keepAll) cout << "rm run"+to_string(threadNumber)+".*.sim.gz\n";
     }
 
@@ -390,41 +387,6 @@ void runSimulation(const string source, const int threadNumber){
     currentThreadCount--;
     if(!test && !hook.empty()) slack("Run "+to_string(threadNumber)+" complete.", hook);
     return;
-}
-
-/**
-@brief Check if directory is empty using C++17's filesystem instead of system calls
-
-  ## Check run directory for filesusing C++17's filesystem instead of system calls
-
-  ### Arguments:
-  * `string dir` - Directory to check if running in.
-
-  ### Notes:
-  If the directory is empty, zero is returned. Otherwise it prompts the user for how they want to procede. Returns 0 if they want to procede and 1 otherwise.
-*/
-bool filesystemEmpty(std::string dir){
-    filesystem::path directory = dir;
-    if(filesystem::is_empty(directory)) return 0;
-    while(1){
-        std::cout << "Directory not empty. Press c then enter to clean, press s then enter to skip, or press e then enter to exit." << std::endl;
-        std::string input;
-        std::cin >> input;
-        if(input[0]=='c'||input[0]=='C'){
-            std::cout << "Cleaning directory." << std::endl;
-            for (auto & p : filesystem::directory_iterator(directory)) filesystem::remove(p);
-            return 0;
-        }
-        if(input[0]=='s'||input[0]=='S'){
-            std::cout << "Skipping clean directory." << std::endl;
-            return 0;
-        }
-        if(input[0]=='e'||input[0]=='E'){
-            std::cout << "Exiting." << std::endl;
-            return 1;
-        }
-        std::cout << "Error. ";
-    }
 }
 
 /**
@@ -470,11 +432,18 @@ Geomega settings:
     - `line number` - line number of the file to modify
     - `contents` - Contents of the line. Array of values(including strings) in the standard format, to be separated by spaces in the file.
 
-### Notes:
+### Dependencies:
+- MEGAlib
+- YAML-cpp
+- pipeliningTools
 
-To compile, use `g++ autoMEGA.cpp -std=c++17 -lX11 -lXtst -pthread -ldl -ldw -g -lcurl -lyaml-cpp -Ofast -Wall -lstdc++fs -o autoMEGA`
+### To compile:
 
-You may also have to precompile pipeliningTools first. See that repo for instructions.
+```
+git submodule update --init --recursive --remote
+# Follow instructions to precompile pipeliningTools
+g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -o autoMEGA $(root-config --cflags --glibs) -I$MEGALIB/include -L$MEGALIB/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc
+```
 
 */
 int main(int argc,char** argv){
@@ -494,7 +463,7 @@ int main(int argc,char** argv){
     }
 
     // Check directory
-    if(filesystemEmpty(".")) return 3;
+    if(directoryEmpty(".")) return 3;
 
     // Parse config file
     YAML::Node config = YAML::LoadFile(settings);
