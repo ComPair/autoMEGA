@@ -1,19 +1,12 @@
-#include <iostream>
+#include "pipeliningTools/pipeline.h"
+
 using namespace std;
 #include <TROOT.h>
 #include <TApplication.h>
 #include <TEnv.h>
 #include <MString.h>
 #include <TSystem.h>
-#include <sys/stat.h>
 #include "MInterfaceGeomega.h"
-#include "MCMain.hh"
-
-long GetFileSize(std::string filename){
-    struct stat stat_buf;
-    int rc = stat(filename.c_str(), &stat_buf);
-    return rc == 0 ? stat_buf.st_size : -1;
-}
 
 class aMInterfaceGeomega : public MInterfaceGeomega {
 public:
@@ -24,7 +17,8 @@ public:
         if(!ReadGeometry()) return 1;
 
         bool status = m_Geometry->CheckOverlaps();
-        if(!status) return 1;
+        cerr << "Root status: " << status << endl;
+        //if(!status) return 1;
 
         if(!MFile::Exists(g_MEGAlibPath + "/bin/cosima")) return 0;
 
@@ -40,33 +34,12 @@ public:
 
         MString WorkingDirectory = gSystem->WorkingDirectory();
         gSystem->ChangeDirectory(gSystem->TempDirectory());
-        gSystem->Exec(MString("bash -c \"source ${MEGALIB}/bin/source-megalib.sh; cosima ") + FileName + MString(" 2>&1 | grep \"WARNING\" -A 3 &> "+outputFile+"\""));
+        gSystem->Exec(MString("bash -c \"source ${MEGALIB}/bin/source-megalib.sh; cosima ") + FileName + MString(" 2>&1 | grep 'issued by : G4PVPlacement::CheckOverlaps()' &> "+outputFile+"\""));
         gSystem->Exec(MString("rm -f DelMe.*.sim ") + FileName);
-        long int size = GetFileSize(outputFile);
+        long int size = getFileSize(outputFile);
         gSystem->ChangeDirectory(WorkingDirectory);
+        cerr << "Cosima size: " << size << endl;
         return size!=0;
     }
+
 };
-
-int main(int argc,char** argv){
-
-    gROOT->SetBatch(true);
-    mout.setstate(std::ios_base::failbit);
-    gErrorIgnoreLevel = kFatal;
-
-    int overall = 0;
-
-    for(int i=1;i<argc;i++){
-        aMInterfaceGeomega geomega;
-        geomega.SetGeometry(argv[i]);
-        bool good = geomega.TestIntersections("g.geo.setup.out");
-        cout.clear();
-        cout << good << endl;
-        std::cout.setstate(std::ios_base::failbit);
-        overall +=good;
-    }
-
-    mout.clear();
-
-    return overall;
-}

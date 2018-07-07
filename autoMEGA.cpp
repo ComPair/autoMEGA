@@ -9,6 +9,10 @@
 #include "yaml-cpp/yaml.h"
 #include <regex>
 
+#ifndef CI_PIPELINE
+#include "aMInterfaceGeomega.h"
+#endif
+
 using namespace std;
 
 // Default values for all arguments. Strings cannot be atomic, but they should only be read by threads, so there shouldnt be a problem.
@@ -242,21 +246,25 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
         legendLock.unlock();
     } else geometries.push_back("g.geo.setup");
 
-    // Verify all geometries TODO: link this with geomega directly instead of with bash call
+    // Verify all geometries
     if(!test) for(size_t i=0;i<geometries.size();i++){
-        bash("source ${MEGALIB}/bin/source-megalib.sh; geomega -f "+geometries[i]+" --check-geometry > geomega.run"+to_string(i)+".out");
-        ifstream overlapCheck("geomega.run"+to_string(i)+".out");
-        bool check0=0,check1=0;
-        if(overlapCheck.is_open()) for(string line;getline(overlapCheck,line);){
-            if(line=="No extrusions and overlaps detected with ROOT (ROOT claims to be able to detect 95% of them)") check0=1;
-            if(line=="-------- Cosima output start --------" && (getline(overlapCheck,line) || line=="-------- Cosima output stop ---------")) check1=1;
-        }
-        if(!(check0&&check1)){
+        #ifndef CI_PIPELINE
+        gROOT->SetBatch(true);
+        mout.setstate(std::ios_base::failbit);
+        gErrorIgnoreLevel = kFatal;
+        cout.setstate(ios_base::failbit);
+
+        aMInterfaceGeomega geometryTest;
+        geometryTest.SetGeometry(geometries[i]);
+        if(geometryTest.TestIntersections("cosima.test.out")){
             cerr << "GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list." << endl;
             if(!hook.empty()) slack("GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list.",hook);
             geometries.erase(geometries.begin()+i--);
         }
-    } else for(size_t i=0;i<geometries.size();i++) cout << "source ${MEGALIB}/bin/source-megalib.sh; geomega -f "+geometries[i]+" --check-geometry | tee geomega.run"+to_string(i)+".out" << endl;
+
+        mout.clear(); cout.clear();
+        #endif
+    }
 
     return 0;
 }
