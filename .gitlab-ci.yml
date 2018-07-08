@@ -9,7 +9,7 @@ build:
     - cd pipeliningTools
     - g++ -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -g -Ofast -Wall -c pipeline.h
     - cd ..
-    - g++ autoMEGA.cpp -std=c++17 -lX11 -lXtst -pthread -ldl -ldw -g -lcurl -lyaml-cpp -Ofast -Wall -lstdc++fs -o autoMEGA -D CI_PIPELINE
+    - g++ autoMEGA.cpp -std=c++17 -lX11 -lXtst -pthread -ldl -ldw -g -lcurl -lyaml-cpp -Ofast -Wall -lstdc++fs -o autoMEGA -D CI_PIPELINE -D_GLIBCXX_USE_CXX11_ABI=1
 
 pages:
   only:

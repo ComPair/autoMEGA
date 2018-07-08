@@ -246,14 +246,14 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
         legendLock.unlock();
     } else geometries.push_back("g.geo.setup");
 
+    #ifndef CI_PIPELINE
+    gROOT->SetBatch(true);
+    mout.setstate(std::ios_base::failbit);
+    gErrorIgnoreLevel = kFatal;
+    cout.setstate(ios_base::failbit);
+
     // Verify all geometries
     if(!test) for(size_t i=0;i<geometries.size();i++){
-        #ifndef CI_PIPELINE
-        gROOT->SetBatch(true);
-        mout.setstate(std::ios_base::failbit);
-        gErrorIgnoreLevel = kFatal;
-        cout.setstate(ios_base::failbit);
-
         aMInterfaceGeomega geometryTest;
         geometryTest.SetGeometry(geometries[i]);
         if(geometryTest.TestIntersections("cosima.test.out")){
@@ -261,10 +261,9 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
             if(!hook.empty()) slack("GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list.",hook);
             geometries.erase(geometries.begin()+i--);
         }
-
-        mout.clear(); cout.clear();
-        #endif
     }
+    mout.clear(); cout.clear();
+    #endif
 
     return 0;
 }
@@ -450,7 +449,7 @@ Geomega settings:
 ```
 git submodule update --init --recursive --remote
 # Follow instructions to precompile pipeliningTools
-g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -o autoMEGA $(root-config --cflags --glibs) -I$MEGALIB/include -L$MEGALIB/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc
+g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -o autoMEGA $(root-config --cflags --glibs) -I$MEGALIB/include -L$MEGALIB/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc -D_GLIBCXX_USE_CXX11_ABI=1
 ```
 
 */

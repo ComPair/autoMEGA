@@ -8,11 +8,34 @@ using namespace std;
 #include <TSystem.h>
 #include "MInterfaceGeomega.h"
 
+/**
+ @brief Interface to geomega to run geometry checks
+
+ ## Interface to geomega to run geometry checks
+
+ ### Purpose
+ Extends MInterfaceGeomega in order to allow autoMEGA to directly check the geometry for overlaps without a bash call or GUI.
+*/
 class aMInterfaceGeomega : public MInterfaceGeomega {
 public:
+    /**
+ @brief Set geometry filename
+    */
     bool SetGeometry(MString FileName, bool UpdateGui = true) {
         return m_Data->SetCurrentFileName(FileName);
     }
+
+    /**
+ @brief Check geometry for overlaps
+
+ ## Check geometry for overlaps
+
+ ### Arguments
+ - `std::string outputFile` - Temp file to write cosima warnings to
+
+ ### Notes
+ Returns 1 if there is an overlap, returns 0 if otherwise. If cosima cannot be found or files cannot be created for a test, then that test may be skipped.
+    */
     bool TestIntersections(std::string outputFile){
         if(!ReadGeometry()) return 1;
 
@@ -29,7 +52,7 @@ public:
         out.open(FileName);
         if (!out.is_open()) return 0;
 
-        out<<"Version 1\nGeometry "<<m_Data->GetCurrentFileName()<<"\nCheckForOverlaps 1000 0.0001\nPhysicsListEM Standard\nRun Minimum\nMinimum.FileName DelMe\nMinimum.NEvents 1\nMinimum.Source MinimumS\nMinimumS.ParticleType 1\nMinimumS.Position 1 1 0 0 \nMinimumS.SpectralType 1\nMinimumS.Energy 10\nMinimumS.Intensity 1\n";
+        out<<"Version 1\nGeometry "<<m_Data->GetCurrentFileName()<<"\nCheckForOverlaps 10000 0.0001\nPhysicsListEM Standard\nRun Minimum\nMinimum.FileName DelMe\nMinimum.NEvents 1\nMinimum.Source MinimumS\nMinimumS.ParticleType 1\nMinimumS.Position 1 1 0 0 \nMinimumS.SpectralType 1\nMinimumS.Energy 10\nMinimumS.Intensity 1\n";
         out.close();
 
         MString WorkingDirectory = gSystem->WorkingDirectory();
