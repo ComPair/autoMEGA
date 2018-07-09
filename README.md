@@ -8,7 +8,6 @@ The library is currently in a QA state before an initial release.
 
 ### Dependencies:
 - MEGAlib
-- Sh shell links to bash (ubuntu default is dash, to fix use: `sudo ln -sf bash /bin/sh`)
 - YAML-cpp
 - pipeliningTools
 

@@ -48,7 +48,7 @@ public:
 
         bool status = m_Geometry->CheckOverlaps();
         cerr << "Root status: " << status << endl;
-        //if(!status) return 1;
+        if(!status) return 1;
 
         if(!MFile::Exists(g_MEGAlibPath + "/bin/cosima")) return 0;
 

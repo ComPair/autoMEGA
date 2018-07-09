@@ -144,10 +144,10 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
     vector<int> lines;
     vector<vector<string>> options;
     if(geomega["parameters"].size()!=0){
-        for(size_t i=0;i<geomega["parameters"].size();i++){
-            files.push_back(geomega["parameters"][i]["filename"].as<string>());
-            lines.push_back(geomega["parameters"][i]["lineNumber"].as<int>());
-            options.push_back(parseIterativeNode(geomega["parameters"][i]["contents"]));
+        for(YAML::const_iterator it=geomega["parameters"].begin();it != geomega["parameters"].end();++it){
+            files.push_back(it->second["filename"].as<string>());
+            lines.push_back(it->second["lineNumber"].as<int>());
+            options.push_back(parseIterativeNode(it->second["contents"]));
         }
 
         legendLock.lock();
@@ -288,11 +288,11 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
 
     // Parse iterative nodes, but need to specially format them with the correct source and name.
     map<string,vector<string>> options;
-    for(size_t i=0;i<cosima["parameters"].size();i++){
-        if(cosima["parameters"][i]["beam"]) options[cosima["parameters"][i]["source"].as<string>()+".Beam"] = parseIterativeNode(cosima["parameters"][i]["beam"],cosima["parameters"][i]["source"].as<string>()+".Beam");
-        if(cosima["parameters"][i]["spectrum"]) options[cosima["parameters"][i]["source"].as<string>()+".Spectrum"] = parseIterativeNode(cosima["parameters"][i]["spectrum"],cosima["parameters"][i]["source"].as<string>()+".Spectrum");
-        if(cosima["parameters"][i]["flux"]) options[cosima["parameters"][i]["source"].as<string>()+".Flux"] = parseIterativeNode(cosima["parameters"][i]["flux"],cosima["parameters"][i]["source"].as<string>()+".Flux");
-        if(cosima["parameters"][i]["polarization"]) options[cosima["parameters"][i]["source"].as<string>()+".Polarization"] = parseIterativeNode(cosima["parameters"][i]["polarization"],cosima["parameters"][i]["source"].as<string>()+".Polarization");
+    for(YAML::const_iterator it=cosima["parameters"].begin();it != cosima["parameters"].end();++it){
+        if(it->second["beam"]) options[it->second["source"].as<string>()+".Beam"] = parseIterativeNode(it->second["beam"],it->second["source"].as<string>()+".Beam");
+        if(it->second["spectrum"]) options[it->second["source"].as<string>()+".Spectrum"] = parseIterativeNode(it->second["spectrum"],it->second["source"].as<string>()+".Spectrum");
+        if(it->second["flux"]) options[it->second["source"].as<string>()+".Flux"] = parseIterativeNode(it->second["flux"],it->second["source"].as<string>()+".Flux");
+        if(it->second["polarization"]) options[it->second["source"].as<string>()+".Polarization"] = parseIterativeNode(it->second["polarization"],it->second["source"].as<string>()+".Polarization");
     }
     if(geometries.size()!=0){
         for(auto& g : geometries) g = "Geometry "+g;
