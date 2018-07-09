@@ -5,11 +5,7 @@ build:
   before_script:
     - apt update && apt -y install make autoconf graphviz libdw-dev libxtst-dev libelf-dev libcurl4-gnutls-dev libboost-dev libyaml-cpp-dev
   script:
-    - git submodule update --init --recursive --remote
-    - cd pipeliningTools
-    - g++ -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -g -Ofast -Wall -c pipeline.h
-    - cd ..
-    - g++ autoMEGA.cpp -std=c++17 -lX11 -lXtst -pthread -ldl -ldw -g -lcurl -lyaml-cpp -Ofast -Wall -lstdc++fs -o autoMEGA -D CI_PIPELINE -D_GLIBCXX_USE_CXX11_ABI=1
+    - make noMEGAlib
 
 pages:
   only:
