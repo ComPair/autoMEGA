@@ -8,10 +8,7 @@
 #include "pipeliningTools/pipeline.h"
 #include "yaml-cpp/yaml.h"
 #include <regex>
-
-#ifndef CI_PIPELINE
-#include "aMInterfaceGeomega.h"
-#endif
+#include <libgen.h>
 
 using namespace std;
 
@@ -246,24 +243,20 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
         legendLock.unlock();
     } else geometries.push_back("g.geo.setup");
 
-    #ifndef CI_PIPELINE
-    gROOT->SetBatch(true);
-    mout.setstate(std::ios_base::failbit);
-    gErrorIgnoreLevel = kFatal;
-    cout.setstate(ios_base::failbit);
+    char result[ 1024 ];
+    ssize_t count = readlink("/proc/self/exe", result, 1024);
+    string path = (count != -1)?dirname(result):".";
 
     // Verify all geometries
     if(!test) for(size_t i=0;i<geometries.size();i++){
-        aMInterfaceGeomega geometryTest;
-        geometryTest.SetGeometry(geometries[i]);
-        if(geometryTest.TestIntersections("cosima.test.out")){
+        int i, ret=system((path+"/checkGeometry "+geometries[i]).c_str());
+        i=WEXITSTATUS(ret); // Get return value
+        if(i){
             cerr << "GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list." << endl;
             if(!hook.empty()) slack("GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list.",hook);
             geometries.erase(geometries.begin()+i--);
         }
-    }
-    mout.clear(); cout.clear();
-    #endif
+    } else cout << (path+"/checkGeometry "+geometries[i]) << endl;
 
     return 0;
 }
@@ -449,7 +442,8 @@ Geomega settings:
 ```
 git submodule update --init --recursive --remote
 # Follow instructions to precompile pipeliningTools
-g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -o autoMEGA $(root-config --cflags --glibs) -I$MEGALIB/include -L$MEGALIB/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc -D_GLIBCXX_USE_CXX11_ABI=1
+g++ checkGeometry.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -o checkGeometry $(root-config --cflags --glibs) -I$MEGALIB/include -L$MEGALIB/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc
+g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -o autoMEGA
 ```
 
 */

@@ -18,6 +18,13 @@ using namespace std;
 */
 class aMInterfaceGeomega : public MInterfaceGeomega {
 public:
+    aMInterfaceGeomega() : MInterfaceGeomega() {
+        cout.setstate(ios_base::failbit);
+        gROOT->SetBatch(true);
+        mout.setstate(std::ios_base::failbit);
+        gErrorIgnoreLevel = kFatal;
+    }
+
     /**
  @brief Set geometry filename
     */
@@ -34,7 +41,7 @@ public:
  - `std::string outputFile` - Temp file to write cosima warnings to
 
  ### Notes
- Returns 1 if there is an overlap, returns 0 if otherwise. If cosima cannot be found or files cannot be created for a test, then that test may be skipped.
+ Returns 1 if there is an overlap, returns 0 otherwise. If cosima cannot be found or files cannot be created for a test, then that test may be skipped.
     */
     bool TestIntersections(std::string outputFile){
         if(!ReadGeometry()) return 1;
@@ -66,3 +73,37 @@ public:
     }
 
 };
+
+/**
+@brief External cpp file to check geomega geometries without linking libraries or opening a GUI
+
+## External cpp file to check geomega geometries without linking libraries or opening a GUI
+
+### Arguments
+All arguments are parsed as filenames to be checked
+
+### Notes:
+Returns the total number of invalid geometries
+
+### To build:
+```
+git submodule update --init --recursive --remote
+# Follow instructions to precompile pipeliningTools
+g++ checkGeometry.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -o checkGeometry $(root-config --cflags --glibs) -I$MEGALIB/include -L$MEGALIB/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc
+```
+
+*/
+int main(int argc,char** argv){
+    int overall = 0;
+
+    // Check each geometry, return number of failures
+    for(int i=1;i<argc;i++){
+        aMInterfaceGeomega geomega;
+        geomega.SetGeometry(argv[i]);
+        bool good = geomega.TestIntersections(string(argv[i])+".out");
+        overall +=good;
+    }
+
+
+    return overall;
+}
