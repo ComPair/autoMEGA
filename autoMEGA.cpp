@@ -256,7 +256,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
             if(!hook.empty()) slack("GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list.",hook);
             geometries.erase(geometries.begin()+i--);
         }
-    } else cout << (path+"/checkGeometry "+geometries[i]) << endl;
+    } else for(size_t i=0;i<geometries.size();i++) cout << (path+"/checkGeometry "+geometries[i]) << endl;
 
     return 0;
 }
