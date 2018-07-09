@@ -81,8 +81,8 @@ vector<string> parseIterativeNode(YAML::Node contents, std::string prepend=""){
 */
 int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
     if(recursionDepth>1024){
-        cerr << "Exceeded max recursion depth of 1024. This is likely due to a curcular dependency. If not, then your geometry is way to complex. Exiting." << endl;
-        if(!hook.empty()) slack("GEOMERGE: Exceeded max recursion depth of 1024. This is likely due to a curcular dependency. If not, then your geometry is way to complex. Exiting.",hook);
+        cerr << "Exceeded max recursion depth of 1024. This is likely due to a circular dependency. If not, then your geometry is way to complex. Exiting." << endl;
+        if(!hook.empty()) slack("GEOMERGE: Exceeded max recursion depth of 1024. This is likely due to a circular dependency. If not, then your geometry is way to complex. Exiting.",hook);
         return -1;
     }
     if(recursionDepth==0) out << "///Include " << inputFile << "\n"; // Note initial file
