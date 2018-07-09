@@ -249,9 +249,9 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
 
     // Verify all geometries
     if(!test) for(size_t i=0;i<geometries.size();i++){
-        int i, ret=system((path+"/checkGeometry "+geometries[i]).c_str());
-        i=WEXITSTATUS(ret); // Get return value
-        if(i){
+        int status, ret=system((path+"/checkGeometry "+geometries[i]).c_str());
+        status=WEXITSTATUS(ret); // Get return value
+        if(status){
             cerr << "GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list." << endl;
             if(!hook.empty()) slack("GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list.",hook);
             geometries.erase(geometries.begin()+i--);
