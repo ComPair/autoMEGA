@@ -9,10 +9,15 @@ The library is currently in a QA state before an initial release.
 ### Dependencies:
 - MEGAlib
 - YAML-cpp
-- pipeliningTools
+- [pipeliningTools](https://gitlab.com/cbray/pipeliningTools)
 
 ### To compile:
 
+```
+make
+```
+
+Or, manually:
 ```
 git submodule update --init --recursive --remote
 # Follow instructions to precompile pipeliningTools

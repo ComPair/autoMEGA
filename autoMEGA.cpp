@@ -440,6 +440,11 @@ Geomega settings:
 ### To compile:
 
 ```
+make
+```
+
+Or, manually:
+```
 git submodule update --init --recursive --remote
 # Follow instructions to precompile pipeliningTools
 g++ checkGeometry.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -o checkGeometry $(root-config --cflags --glibs) -I$MEGALIB/include -L$MEGALIB/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc
