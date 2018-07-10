@@ -106,14 +106,14 @@ int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
             string includedFile; ss >> includedFile;
             string baseFile = includedFile;
             if(includedFile[0]!='/') includedFile=inputFile.substr(0,inputFile.find_last_of('/'))+"/"+includedFile; // Workaround for relative file references
-            if(geoMerge(includedFile,out,++recursionDepth)) return 1;
+            if(geoMerge(includedFile,out,recursionDepth+1)) return 1;
             out << "///End " << baseFile << "\n";
         }else{
             out << line << "\n";
         }
     }
 
-    if(recursionDepth==0) out << "///End " << inputFile << "\n"; // Note initial file
+    if(recursionDepth==0) out << "///End " << inputFile << "\n"; // Note final file
     return 0;
 }
 
@@ -181,10 +181,18 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
                     stringstream newGeometry;
                     string line;
 
+                    bool foundFile = 0;
                     // Seek to "///Include "+files[i]
                     while(getline(alteredGeometry,line)){
                         newGeometry << line << "\n";
-                        if(line=="///Include "+files[i]) break;
+                        if(line=="///Include "+files[i]){ foundFile=1; break;}
+                    }
+
+                    // Make sure we found the file
+                    if(!foundFile){
+                        cerr << "Attempted to alter line number past end of file. File: \""+files[i]+"\". Exiting." << endl;
+                        if(!hook.empty()) slack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i],hook);
+                        return 5;
                     }
 
                     // Seek lines[i] lines ahead

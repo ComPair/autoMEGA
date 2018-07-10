@@ -3,9 +3,9 @@ CC=g++
 MAIN_FLAGS=-std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall
 MEGALIB_FLAGS=`root-config --cflags --glibs` -I$(MEGALIB)/include -L$(MEGALIB)/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc
 
-all: init pipeline checkGeometry autoMEGA
+all: clean init pipeline checkGeometry autoMEGA
 
-noMEGAlib: init pipeline autoMEGA
+noMEGAlib: clean init pipeline autoMEGA
 
 init:
 		git submodule update --init --recursive
