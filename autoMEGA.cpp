@@ -112,6 +112,8 @@ int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
             out << line << "\n";
         }
     }
+
+    if(recursionDepth==0) out << "///End " << inputFile << "\n"; // Note initial file
     return 0;
 }
 
@@ -196,12 +198,12 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
                         if(command=="///Include"){
                             while(getline(alteredGeometry,line)){
                                 newGeometry << line << "\n";
+                                // Check we havent passed "///End "+files[i]
                                 if(line=="///End "+files[i]){
                                     cerr << "Attempted to alter line number past end of file. File: \""+files[i]+"\". Exiting." << endl;
                                     if(!hook.empty()) slack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i],hook);
                                     return 4;
                                 }
-                                // Check we havent passed "///End "+files[i]
                                 if(line=="///End "+file) break;
                             }
                         }
