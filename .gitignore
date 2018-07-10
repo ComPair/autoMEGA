@@ -33,6 +33,7 @@
 
 # Specific files
 autoMEGA
+checkGeometry
 config.yaml
 test/
 *.source
