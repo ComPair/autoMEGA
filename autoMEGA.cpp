@@ -290,6 +290,11 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
         }
         // Join simulation threads
         for(size_t i=0;i<threadpool.size();i++) threadpool[i].join();
+
+        // Properly order vector and remove empty strings (failed geometries)
+        std::sort(geometries.begin(), geometries.end());
+        geometries.erase(std::remove(geometries.begin(), geometries.end(), ""), geometries.end());
+
     } else for(size_t i=0;i<geometries.size();i++) cout << (path+"/checkGeometry "+geometries[i]) << endl;
 
     return 0;
