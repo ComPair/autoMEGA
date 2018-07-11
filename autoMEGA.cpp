@@ -106,15 +106,40 @@ int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
             string includedFile; ss >> includedFile;
             string baseFile = includedFile;
             if(includedFile[0]!='/') includedFile=inputFile.substr(0,inputFile.find_last_of('/'))+"/"+includedFile; // Workaround for relative file references
-            if(geoMerge(includedFile,out,++recursionDepth)) return 1;
+            if(geoMerge(includedFile,out,recursionDepth+1)) return 1;
             out << "///End " << baseFile << "\n";
         }else{
             out << line << "\n";
         }
     }
+
+    if(recursionDepth==0) out << "///End " << inputFile << "\n"; // Note final file
     return 0;
 }
 
+/**
+
+ @brief Check geometry file using checkGeometry
+
+ ## Check geometry file using checkGeometry
+
+ ### Arguments
+ - `string& filename` - Geometry file to test
+ - `string path` - Path to folder containing checkGeometry
+
+ ### Notes
+ filename will be empty after the test if it is invalid
+*/
+void testGeometry(string& filename, string path){
+    int status, ret=system((path+"/checkGeometry "+filename).c_str());
+    status=WEXITSTATUS(ret); // Get return value
+    if(status){
+        cerr << "GEOMEGA: Geometry error in geometry \""+filename+"\". Removing geometry from list." << endl;
+        if(!hook.empty()) slack("GEOMEGA: Geometry error in geometry \""+filename+"\". Removing geometry from list.",hook);
+        filename="";
+    }
+    currentThreadCount--;
+}
 
 
 /**
@@ -179,10 +204,18 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
                     stringstream newGeometry;
                     string line;
 
+                    bool foundFile = 0;
                     // Seek to "///Include "+files[i]
                     while(getline(alteredGeometry,line)){
                         newGeometry << line << "\n";
-                        if(line=="///Include "+files[i]) break;
+                        if(line=="///Include "+files[i]){ foundFile=1; break;}
+                    }
+
+                    // Make sure we found the file
+                    if(!foundFile){
+                        cerr << "Attempted to alter line number past end of file. File: \""+files[i]+"\". Exiting." << endl;
+                        if(!hook.empty()) slack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i],hook);
+                        return 5;
                     }
 
                     // Seek lines[i] lines ahead
@@ -196,12 +229,12 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
                         if(command=="///Include"){
                             while(getline(alteredGeometry,line)){
                                 newGeometry << line << "\n";
+                                // Check we havent passed "///End "+files[i]
                                 if(line=="///End "+files[i]){
                                     cerr << "Attempted to alter line number past end of file. File: \""+files[i]+"\". Exiting." << endl;
                                     if(!hook.empty()) slack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i],hook);
                                     return 4;
                                 }
-                                // Check we havent passed "///End "+files[i]
                                 if(line=="///End "+file) break;
                             }
                         }
@@ -247,16 +280,20 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
     ssize_t count = readlink("/proc/self/exe", result, 1024);
     string path = (count != -1)?dirname(result):".";
 
+    vector<thread> threadpool;
     // Verify all geometries
     if(!test) for(size_t i=0;i<geometries.size();i++){
-        int status, ret=system((path+"/checkGeometry "+geometries[i]).c_str());
-        status=WEXITSTATUS(ret); // Get return value
-        if(status){
-            cerr << "GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list." << endl;
-            if(!hook.empty()) slack("GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list.",hook);
-            geometries.erase(geometries.begin()+i--);
-        }
+        while(currentThreadCount>=maxThreads)sleep(0.1);
+        threadpool.push_back(thread(testGeometry,std::ref(geometries[i]),path));
+        currentThreadCount++;
     } else for(size_t i=0;i<geometries.size();i++) cout << (path+"/checkGeometry "+geometries[i]) << endl;
+
+    // Join simulation threads
+    for(size_t i=0;i<threadpool.size();i++) threadpool[i].join();
+    // Properly order vector and remove empty strings (failed geometries)
+    std::sort(geometries.begin(), geometries.end());
+    geometries.erase(std::remove(geometries.begin(), geometries.end(), ""), geometries.end());
+
 
     return 0;
 }

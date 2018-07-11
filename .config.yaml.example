@@ -10,7 +10,7 @@
     filename: "../Geometry/AMEGO_4x4TowerModel/AmegoBase.geo.setup" # Base filename is required if geomega section is present. Otherwise a parser error will be thrown
     parameters: # Optional
       siOptions: # Node name is not important or used anywhere. However, the following three lines are required (order unimportant as long as they are descendants of this node)
-        filename: "SiStripDetector.geo" # Filename of file to change
+        filename: "SiStripDetector.geo" # Filename of file to change. Should be formatted however it is referenced when included.
         lineNumber: 22 # Line numer to change
         contents: [[["For I 60"]], [[1,2]], [1,10,5]] # Standard format of line contents. Each element in the overall list will be separated by a space in the final document. Each sub-list may be in one of two formats: a double list of literals to use (eg. [["literal","values","to","use"]]) or an iterative list (eg [initial value, final value, step value]). The former are treated as strings, the latter are treated as doubles.
       1:
