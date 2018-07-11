@@ -1,6 +1,19 @@
 # autoMEGA
 
-Tool for automating MEGAlib simulations. The eventual goal is to run iterative simulations based on a set of parameters. These will likely include running simulations of slightly modified geometries or sources and plotting the changes in output values such as A_eff or the PSF.
+Tool for automating MEGAlib simulations. The goal is to create a user-friendly method for running iterative simulations.
+
+Features:
+- Automatically generate modified Geomega (`*.geo.setup`) and Cosima (`*.source`) files
+  - Flexible parameters
+  - Unlimited configurations
+- Capable of running dozens of simultaneous simulations
+  - Ideal for optimizing instrument dimensions, generating plots of continuum sensitivity, or calculating Aeff
+- User-Friendly
+  - Convenient YAML configuration
+  - Capable of notifying the user of simulation completion (or errors)
+    - Email
+    - Slack
+- ~~Causes robot uprising~~
 
 ## Notes
 
