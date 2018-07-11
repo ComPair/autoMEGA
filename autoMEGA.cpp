@@ -280,22 +280,20 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
     ssize_t count = readlink("/proc/self/exe", result, 1024);
     string path = (count != -1)?dirname(result):".";
 
+    vector<thread> threadpool;
     // Verify all geometries
     if(!test) for(size_t i=0;i<geometries.size();i++){
-        vector<thread> threadpool;
-        for(size_t i=0;i<geometries.size();i++){
-            while(currentThreadCount>=maxThreads)sleep(0.1);
-            threadpool.push_back(thread(testGeometry,std::ref(geometries[i]),path));
-            currentThreadCount++;
-        }
-        // Join simulation threads
-        for(size_t i=0;i<threadpool.size();i++) threadpool[i].join();
-
-        // Properly order vector and remove empty strings (failed geometries)
-        std::sort(geometries.begin(), geometries.end());
-        geometries.erase(std::remove(geometries.begin(), geometries.end(), ""), geometries.end());
-
+        while(currentThreadCount>=maxThreads)sleep(0.1);
+        threadpool.push_back(thread(testGeometry,std::ref(geometries[i]),path));
+        currentThreadCount++;
     } else for(size_t i=0;i<geometries.size();i++) cout << (path+"/checkGeometry "+geometries[i]) << endl;
+
+    // Join simulation threads
+    for(size_t i=0;i<threadpool.size();i++) threadpool[i].join();
+    // Properly order vector and remove empty strings (failed geometries)
+    std::sort(geometries.begin(), geometries.end());
+    geometries.erase(std::remove(geometries.begin(), geometries.end(), ""), geometries.end());
+
 
     return 0;
 }
