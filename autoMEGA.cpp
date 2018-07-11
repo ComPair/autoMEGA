@@ -117,6 +117,29 @@ int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
     return 0;
 }
 
+/**
+
+ @brief Check geometry file using checkGeometry
+
+ ## Check geometry file using checkGeometry
+
+ ### Arguments
+ - `string& filename` - Geometry file to test
+ - `string path` - Path to folder containing checkGeometry
+
+ ### Notes
+ filename will be empty after the test if it is invalid
+*/
+void testGeometry(string& filename, string path){
+    int status, ret=system((path+"/checkGeometry "+filename).c_str());
+    status=WEXITSTATUS(ret); // Get return value
+    if(status){
+        cerr << "GEOMEGA: Geometry error in geometry \""+filename+"\". Removing geometry from list." << endl;
+        if(!hook.empty()) slack("GEOMEGA: Geometry error in geometry \""+filename+"\". Removing geometry from list.",hook);
+        filename="";
+    }
+    currentThreadCount--;
+}
 
 
 /**
@@ -259,13 +282,14 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
 
     // Verify all geometries
     if(!test) for(size_t i=0;i<geometries.size();i++){
-        int status, ret=system((path+"/checkGeometry "+geometries[i]).c_str());
-        status=WEXITSTATUS(ret); // Get return value
-        if(status){
-            cerr << "GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list." << endl;
-            if(!hook.empty()) slack("GEOMEGA: Geometry error in geometry \""+geometries[i]+"\". Removing geometry from list.",hook);
-            geometries.erase(geometries.begin()+i--);
+        vector<thread> threadpool;
+        for(size_t i=0;i<geometries.size();i++){
+            while(currentThreadCount>=maxThreads)sleep(0.1);
+            threadpool.push_back(thread(testGeometry,std::ref(geometries[i]),path));
+            currentThreadCount++;
         }
+        // Join simulation threads
+        for(size_t i=0;i<threadpool.size();i++) threadpool[i].join();
     } else for(size_t i=0;i<geometries.size();i++) cout << (path+"/checkGeometry "+geometries[i]) << endl;
 
     return 0;
