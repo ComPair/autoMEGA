@@ -394,7 +394,7 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
 void runSimulation(const string source, const int threadNumber){
     // Get seed
     uint32_t seed = random_seed<uint32_t>();
-    if(!test && !hook.empty() && slackVerbosity>=3) slack("Starting run "+to_string(threadNumber)+".", hook);
+    if(!hook.empty() && slackVerbosity>=3) slack("Starting run "+to_string(threadNumber)+".", hook);
 
     // Create legend
     legendLock.lock();
@@ -435,7 +435,7 @@ void runSimulation(const string source, const int threadNumber){
 
     // Cleanup and exit
     currentThreadCount--;
-    if(!test && !hook.empty() && slackVerbosity>=2) slack("Run "+to_string(threadNumber)+" complete.", hook);
+    if(!hook.empty() && slackVerbosity>=2) slack("Run "+to_string(threadNumber)+" complete.", hook);
     return;
 }
 
