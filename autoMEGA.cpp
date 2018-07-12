@@ -528,6 +528,7 @@ int main(int argc,char** argv){
     if(config["hook"]) hook = config["hook"].as<string>();
     if(config["maxThreads"]) maxThreads = config["maxThreads"].as<int>();
     if(config["keepAll"]) keepAll = config["keepAll"].as<bool>();
+    if(config["slackVerbosity"]) keepAll = config["slackVerbosity"].as<int>();
 
     if(config["revanSettings"]) revanSettings = config["revanSettings"].as<string>();
 
