@@ -3,6 +3,7 @@
   hook: "https://hooks.slack.com/services/INSERT/WEBHOOK/HERE" # Obtain link from slack integration
   maxThreads: 24 # If undefined, autoMEGA will attempt to determine number of threads available, and use that instead
   keepAll: false # If true, then *.sim.gz files are saved. Otherwise they are deleted to save storage space
+  slackVerbosity: 3 # Level 3 prints all messages, level 2 prints fewer messages, level one prints only error messages, and level zero only prints final messages. Defaults to zero
 
   revanSettings: "~/revan.cfg" # Revan settings file. If not present, this is the default
 
