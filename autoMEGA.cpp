@@ -36,6 +36,8 @@ atomic<int> test(0);
 atomic<bool> keepAll(false);
 /// Int to indicate slack verbosity level. Level 3 prints all messages, level 2 prints fewer messages, level one prints only error messages, and level zero only prints final messages. Defaults to zero
 atomic<int> slackVerbosity(0);
+/// Int to indicate cosima verbosity level. Defaults to zero
+atomic<int> cosimaVerbosity(0);
 
 /**
  @brief Parse iterative nodes in list or pattern mode
@@ -414,7 +416,7 @@ void runSimulation(const string source, const int threadNumber){
     // Actually run simulation and analysis
     // Remove intermediary files when they are no longer necessary (unless keepAll is set)
     if(!test){
-        int status, ret=system(("bash -c \"source ${MEGALIB}/bin/source-megalib.sh; cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz; exit $?\"").c_str());
+        int status, ret=system(("bash -c \"source ${MEGALIB}/bin/source-megalib.sh; cosima -v "+to_string(cosimaVerbosity)+" -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz; exit $?\"").c_str());
         status=WEXITSTATUS(ret); // Get return value
         if(status){
             slack("Run "+to_string(threadNumber)+" failed.", hook);
@@ -428,7 +430,7 @@ void runSimulation(const string source, const int threadNumber){
         }
         if(!keepAll) removeWildcard("run"+to_string(threadNumber)+".*.sim.gz");
     }else{
-        cout << "bash -c \"source ${MEGALIB}/bin/source-megalib.sh; cosima -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz; exit $?\"\n";
+        cout << "bash -c \"source ${MEGALIB}/bin/source-megalib.sh; cosima -v "+to_string(cosimaVerbosity)+" -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz; exit $?\"\n";
         cout << "bash -c \"source ${MEGALIB}/bin/source-megalib.sh; revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".*.sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz; exit $?\"\n";
         if(!keepAll) cout << "rm run"+to_string(threadNumber)+".*.sim.gz\n";
     }
@@ -458,6 +460,7 @@ autoMEGA settings:
 General settings files:
  - `revanSettings` - Defaults to system default (`~/revan.cfg`)
  - `slackVerbosity` - Slack verbosity. Level 3 prints all messages, level 2 prints fewer messages, level one prints only error messages, and level zero only prints final messages. Defaults to zero
+ - `cosimaVerbosity` - Cosima verbosity. Defaults to zero.
 
 Standard parameter format:
 
@@ -529,6 +532,7 @@ int main(int argc,char** argv){
     if(config["maxThreads"]) maxThreads = config["maxThreads"].as<int>();
     if(config["keepAll"]) keepAll = config["keepAll"].as<bool>();
     if(config["slackVerbosity"]) slackVerbosity = config["slackVerbosity"].as<int>();
+    if(config["cosimaVerbosity"]) cosimaVerbosity = config["cosimaVerbosity"].as<int>();
 
     if(config["revanSettings"]) revanSettings = config["revanSettings"].as<string>();
 
