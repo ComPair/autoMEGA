@@ -40,3 +40,4 @@ test/
 *.geo.setup
 *.legend
 *.tmp
+logo*

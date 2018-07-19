@@ -395,7 +395,7 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
 */
 void runSimulation(const string source, const int threadNumber){
     // Get seed
-    uint32_t seed = random_seed<uint32_t>();
+    uint32_t seed = random_seed<uint32_t>(1);
     if(!hook.empty() && slackVerbosity>=3) slack("Starting run "+to_string(threadNumber)+".", hook);
 
     // Create legend
