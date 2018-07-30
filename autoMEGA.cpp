@@ -153,8 +153,6 @@ int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
  filename will be empty after the test if it is invalid
 */
 void testGeometry(string& filename, string path){
-    std::cout.setstate(std::ios_base::failbit);
-    std::cerr.setstate(std::ios_base::failbit);
     int status, ret=system((path+"/checkGeometry "+filename+" &> /dev/null").c_str());
     status=WEXITSTATUS(ret); // Get return value
     if(status){
@@ -164,8 +162,6 @@ void testGeometry(string& filename, string path){
         statusBar[2]--;
     } else statusBar[1]++;
     currentThreadCount--;
-    std::cout.clear();
-    std::cerr.clear();
 }
 
 
@@ -476,7 +472,7 @@ void runSimulation(const string source, const int threadNumber){
     auto end = chrono::steady_clock::now();
     // Cleanup and exit
     currentThreadCount--;
-    if(!hook.empty() && slackVerbosity>=2) slack("Run "+to_string(threadNumber)+" complete. Took "+ beautify_duration(chrono::duration_cast<chrono::seconds>(end-start))+".", hook);
+    if(!hook.empty() && slackVerbosity>=2) slack("Run "+to_string(threadNumber)+" complete. Elapsed time: "+ beautify_duration(chrono::duration_cast<chrono::seconds>(end-start))+".", hook);
     return;
 }
 
@@ -604,7 +600,6 @@ int main(int argc,char** argv){
     legend.open("run.legend");
 
     // Calculate total number of simulations
-    cout << sources.size() << " total simulations." << endl;
     if(!hook.empty() && slackVerbosity>=3) slack("Starting all simulations",hook);
 
     // Start all simulation threads.
@@ -616,6 +611,11 @@ int main(int argc,char** argv){
     // Join simulation threads
     for(size_t i=0;i<threadpool.size();i++) threadpool[i].join();
     legend.close();
+
+    // Enable echo
+    tcgetattr(STDIN_FILENO, &tty);
+    tty.c_lflag |= ECHO;
+    (void) tcsetattr(STDIN_FILENO, TCSANOW, &tty);
 
     // End timer, print command duration
     auto end = chrono::steady_clock::now();
