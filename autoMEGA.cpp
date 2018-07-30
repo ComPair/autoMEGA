@@ -153,7 +153,7 @@ int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
  filename will be empty after the test if it is invalid
 */
 void testGeometry(string& filename, string path){
-    int status, ret=system((path+"/checkGeometry "+filename+" 2&>1 > /dev/null").c_str());
+    int status, ret=system((path+"/checkGeometry "+filename+" > /dev/null 2> /dev/null").c_str());
     status=WEXITSTATUS(ret); // Get return value
     if(status){
         cerr << "GEOMEGA: Geometry error in geometry \""+filename+"\". Removing geometry from list." << endl;
@@ -571,12 +571,11 @@ int main(int argc,char** argv){
     YAML::Node config = YAML::LoadFile(settings);
     if(config["address"]) address = config["address"].as<string>();
     if(config["hook"]) hook = config["hook"].as<string>();
-    if(config["maxThreads"]) maxThreads = config["maxThreads"].as<int>();
     if(config["keepAll"]) keepAll = config["keepAll"].as<bool>();
     if(config["slackVerbosity"]) slackVerbosity = config["slackVerbosity"].as<int>();
     if(config["cosimaVerbosity"]) cosimaVerbosity = config["cosimaVerbosity"].as<int>();
-
     if(config["revanSettings"]) revanSettings = config["revanSettings"].as<string>();
+    if(config["maxThreads"]) maxThreads = config["maxThreads"].as<int>();
 
     // Start status thread
     thread statusThread(handleStatus);
@@ -589,15 +588,14 @@ int main(int argc,char** argv){
     vector<string> sources;
     if(config["cosima"]) if(cosimaSetup(config["cosima"],sources,geometries)!=0) return 3;
 
-    cout << "Using " << maxThreads << " threads." << endl;
-
-    // Start watchdog thread(s)
-    thread watchdog0(storageWatchdog,2000);
-
 
     // Create threadpool
     vector<thread> threadpool;
+    cout << "Using " << maxThreads << " threads." << e-ndl;
     legend.open("run.legend");
+
+    // Start watchdog thread(s)
+    thread watchdog0(storageWatchdog,2000);
 
     // Calculate total number of simulations
     if(!hook.empty() && slackVerbosity>=3) slack("Starting all simulations",hook);
@@ -623,7 +621,7 @@ int main(int argc,char** argv){
     statusThread.join();
     auto end = chrono::steady_clock::now();
     cout << endl << "Total simulation and analysis elapsed time: " << beautify_duration(chrono::duration_cast<chrono::seconds>(end-start)) << endl;
-    if(!hook.empty()) slack("Simulation complete",hook);
-    if(!address.empty()) email(address,"Simulation Complete");
+    if(!hook.empty()) slack("Simulation complete. Elapsed time: "+beautify_duration(chrono::duration_cast<chrono::seconds>(end-start)),hook);
+    if(!address.empty()) email(address,"Simulation Complete. Elapsed time: "+beautify_duration(chrono::duration_cast<chrono::seconds>(end-start)));
     return 0;
 }
