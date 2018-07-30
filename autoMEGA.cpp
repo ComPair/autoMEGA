@@ -66,12 +66,12 @@ void handleStatus(){
     if(!token.empty() && !channel.empty()) ts=slackBotPost(token,channel,">J.A.R.V.I.S., are you up?\nFor you sir, always.");
     while(!exitFlag){
         string currentStatus = "\r";
-        if(statusBar[0]) currentStatus+="Geomega: ["+to_string(statusBar[1])+"/"+to_string(statusBar[2])+"] | ";
-        if(statusBar[3]) currentStatus+="Cosima: ["+to_string(statusBar[4])+"/"+to_string(statusBar[5])+"] | ";
-        if(statusBar[6]) currentStatus+="Revan: ["+to_string(statusBar[7])+"/"+to_string(statusBar[8])+"] | ";
+        if(statusBar[0]) currentStatus+="Geomega: "+to_string()((double) statusBar[1]*100)/statusBar[2])+"% ["+to_string(statusBar[1])+"/"+to_string(statusBar[2])+"] | ";
+        if(statusBar[3]) currentStatus+="Cosima: "+to_string()((double) statusBar[4]*100)/statusBar[5])+"% ["+to_string(statusBar[4])+"/"+to_string(statusBar[5])+"] | ";
+        if(statusBar[6]) currentStatus+="Revan: "+to_string()((double) statusBar[7]*100)/statusBar[8])+"% ["+to_string(statusBar[7])+"/"+to_string(statusBar[8])+"] | ";
         if(averageTime.count()!=0) currentStatus+="Running average time: " + beautify_duration(averageTime) + " | ";
         cout << currentStatus << spinner[i++%4]<< flush;
-        if(!token.empty() && !channel.empty()) slackBotUpdate(token,channel,ts,currentStatus);
+        if(i%3==0 && !token.empty() && !channel.empty()) slackBotUpdate(token,channel,ts,currentStatus);
         usleep(400000);
     }
 }
