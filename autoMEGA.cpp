@@ -591,7 +591,7 @@ int main(int argc,char** argv){
 
     // Create threadpool
     vector<thread> threadpool;
-    cout << "Using " << maxThreads << " threads." << e-ndl;
+    cout << "Using " << maxThreads << " threads." << endl;
     legend.open("run.legend");
 
     // Start watchdog thread(s)
