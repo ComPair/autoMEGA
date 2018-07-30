@@ -497,7 +497,7 @@ void runSimulation(const string source, const int threadNumber){
     auto end = chrono::steady_clock::now();
     chrono::seconds thisTime = chrono::duration_cast<chrono::seconds>(end-start);
     timeLock.lock();
-    averageTime = (averageTime*maxThreads+thisTime)/(maxThreads+1);
+    averageTime = (averageTime.count()!=0)?(averageTime*10+thisTime)/(11):thisTime;
     timeLock.unlock();
     // Cleanup and exit
     currentThreadCount--;
