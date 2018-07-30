@@ -47,13 +47,15 @@ atomic<int> statusBar[9];
  @brief Print simulation status bar
 */
 void handleStatus(){
+    char spinner[4] = {'-','\\','|','/'};
+    unsigned int i=0;
     while(!exitFlag){
-        sleep(1);
+        usleep(400000);
         string currentStatus = "\r";
         if(statusBar[0]) currentStatus+="Geomega: ["+to_string(statusBar[1])+"/"+to_string(statusBar[2])+"] | ";
         if(statusBar[3]) currentStatus+="Cosima: ["+to_string(statusBar[4])+"/"+to_string(statusBar[5])+"] | ";
-        if(statusBar[6]) currentStatus+="Revan: ["+to_string(statusBar[7])+"/"+to_string(statusBar[8])+"]";
-        cout << currentStatus << flush;
+        if(statusBar[6]) currentStatus+="Revan: ["+to_string(statusBar[7])+"/"+to_string(statusBar[8])+"] | ";
+        cout << currentStatus << spinner[i++%4]<< flush;
     }
 }
 
