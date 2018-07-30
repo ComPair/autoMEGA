@@ -69,7 +69,7 @@ void handleStatus(){
         if(statusBar[0]) currentStatus+="Geomega: ["+to_string(statusBar[1])+"/"+to_string(statusBar[2])+"] | ";
         if(statusBar[3]) currentStatus+="Cosima: ["+to_string(statusBar[4])+"/"+to_string(statusBar[5])+"] | ";
         if(statusBar[6]) currentStatus+="Revan: ["+to_string(statusBar[7])+"/"+to_string(statusBar[8])+"] | ";
-        if(averageTime.count()==0) currentStatus+="Weighted average time: " + beautify_duration(averageTime) + " | ";
+        if(averageTime.count()!=0) currentStatus+="Weighted average time: " + beautify_duration(averageTime) + " | ";
         cout << currentStatus << spinner[i++%4]<< flush;
         if(!token.empty() && !channel.empty()) slackBotUpdate(token,channel,ts,currentStatus);
         usleep(400000);
@@ -621,7 +621,7 @@ int main(int argc,char** argv){
 
     // Create threadpool
     vector<thread> threadpool;
-    cout << "\rUsing " << maxThreads << " threads." << endl;
+    cout << "\rUsing " << maxThreads << " threads.                              " << endl;
     legend.open("run.legend");
 
     // Start watchdog thread(s)
