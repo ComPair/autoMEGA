@@ -9,6 +9,8 @@
 #include "yaml-cpp/yaml.h"
 #include <regex>
 #include <libgen.h>
+#include <termios.h>
+#include <unistd.h>
 
 using namespace std;
 
@@ -38,6 +40,22 @@ atomic<bool> keepAll(false);
 atomic<int> slackVerbosity(0);
 /// Int to indicate cosima verbosity level. Defaults to zero
 atomic<int> cosimaVerbosity(0);
+/// Array to store current state for status bar
+atomic<int> statusBar[9];
+
+/**
+ @brief Print simulation status bar
+*/
+void handleStatus(){
+    while(!exitFlag){
+        sleep(1);
+        string currentStatus = "\r";
+        if(statusBar[0]) currentStatus+="Geomega: ["+to_string(statusBar[1])+"/"+to_string(statusBar[2])+"]";
+        if(statusBar[3]) currentStatus+="Cosima: ["+to_string(statusBar[4])+"/"+to_string(statusBar[5])+"]";
+        if(statusBar[6]) currentStatus+="Revan: ["+to_string(statusBar[7])+"/"+to_string(statusBar[8])+"]";
+        cout << currentStatus;
+    }
+}
 
 /**
  @brief Parse iterative nodes in list or pattern mode
@@ -135,13 +153,14 @@ int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
  filename will be empty after the test if it is invalid
 */
 void testGeometry(string& filename, string path){
-    int status, ret=system((path+"/checkGeometry "+filename).c_str());
+    int status, ret=system((path+"/checkGeometry "+filename+" &> /dev/null").c_str());
     status=WEXITSTATUS(ret); // Get return value
     if(status){
         cerr << "GEOMEGA: Geometry error in geometry \""+filename+"\". Removing geometry from list." << endl;
         if(!hook.empty() && slackVerbosity>=1) slack("GEOMEGA: Geometry error in geometry \""+filename+"\". Removing geometry from list.",hook);
         filename="";
-    }
+        statusBar[2]--;
+    } else statusBar[1]++;
     currentThreadCount--;
 }
 
@@ -162,6 +181,9 @@ void testGeometry(string& filename, string path){
  Merges all dependencies into a single file, my default g.geo.setup, then creates additional files from there. In my experience this has worked fine, but let me know if there is a problem with your geometry.
 */
 int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
+    // Update status
+    statusBar[0]=1;
+
     // Merge all files together
     ofstream baseGeometry("g.geo.setup");
     if(!baseGeometry.is_open()){ cerr << "Could not create new base geometry file. Exiting" << endl; if(!hook.empty() && slackVerbosity>=1) slack("GEOMEGA SETUP: Could not create new base geometry file. Exiting.",hook); return 3;}
@@ -191,6 +213,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
                 if(--position<0) break;
                 odometer[position]++;
             } else {
+                statusBar[2]++;
                 // Create legend
                 legend << "Geometry";
                 for(auto& o:odometer) legend << "." << o;
@@ -319,6 +342,9 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
  Only replaces line in a source file, it does not add them as that would be undefined behavior. Make sure that all of your operations replace lines, otherwise they will not be parsed correctly. This may not always throw an error, so manually check that your iterations are properly parsing.
 */
 int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geometries){
+    // Update status
+    statusBar[3]=statusBar[6]=1;
+
     string baseFileName = cosima["filename"].as<string>();
     // Make sure config file exists
     if(!fileExists(baseFileName)){
@@ -377,6 +403,9 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
         out.close();
     }
 
+    // Update status
+    statusBar[5]=statusBar[8]=alteredSources.size();
+
     return 0;
 }
 
@@ -394,6 +423,8 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
 
 */
 void runSimulation(const string source, const int threadNumber){
+    auto start = chrono::steady_clock::now();
+
     // Get seed
     uint32_t seed = random_seed<uint32_t>(1);
     if(!hook.empty() && slackVerbosity>=3) slack("Starting run "+to_string(threadNumber)+".", hook);
@@ -422,12 +453,14 @@ void runSimulation(const string source, const int threadNumber){
             slack("Run "+to_string(threadNumber)+" failed.", hook);
             return;
         }
+        statusBar[4]++;
         ret=system(("bash -c \"source ${MEGALIB}/bin/source-megalib.sh; revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".*.sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz; exit $?\"").c_str());
         status=WEXITSTATUS(ret); // Get return value
         if(status){
             slack("Run "+to_string(threadNumber)+" failed.", hook);
             return;
         }
+        statusBar[7]++;
         if(!keepAll) removeWildcard("run"+to_string(threadNumber)+".*.sim.gz");
     }else{
         cout << "bash -c \"source ${MEGALIB}/bin/source-megalib.sh; cosima -v "+to_string(cosimaVerbosity)+" -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz; exit $?\"\n";
@@ -435,9 +468,11 @@ void runSimulation(const string source, const int threadNumber){
         if(!keepAll) cout << "rm run"+to_string(threadNumber)+".*.sim.gz\n";
     }
 
+    // End timer
+    auto end = chrono::steady_clock::now();
     // Cleanup and exit
     currentThreadCount--;
-    if(!hook.empty() && slackVerbosity>=2) slack("Run "+to_string(threadNumber)+" complete.", hook);
+    if(!hook.empty() && slackVerbosity>=2) slack("Run "+to_string(threadNumber)+" complete. Took "+ beautify_duration(chrono::duration_cast<chrono::seconds>(end-start))+".", hook);
     return;
 }
 
@@ -508,6 +543,13 @@ g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl
 */
 int main(int argc,char** argv){
     auto start = chrono::steady_clock::now();
+    for(int i=0;i<9;i++)statusBar[i]=0;
+
+    // Disable echo
+    struct termios tty;
+    tcgetattr(STDIN_FILENO, &tty);
+    tty.c_lflag &= ~ECHO;
+    (void) tcsetattr(STDIN_FILENO, TCSANOW, &tty);
 
     // Parse command line arguments
     for(int i=0;i<argc;i++){
@@ -548,6 +590,9 @@ int main(int argc,char** argv){
 
     // Start watchdog thread(s)
     thread watchdog0(storageWatchdog,2000);
+    // Start status thread
+    thread statusThread(handleStatus);
+
 
     // Create threadpool
     vector<thread> threadpool;
@@ -574,5 +619,6 @@ int main(int argc,char** argv){
     if(!address.empty()) email(address,"Simulation Complete");
     exitFlag=1;
     watchdog0.join();
+    statusThread.join();
     return 0;
 }
