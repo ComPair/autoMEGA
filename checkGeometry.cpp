@@ -18,12 +18,7 @@ using namespace std;
 */
 class aMInterfaceGeomega : public MInterfaceGeomega {
 public:
-    aMInterfaceGeomega() : MInterfaceGeomega() {
-        cout.setstate(ios_base::failbit);
-        gROOT->SetBatch(true);
-        mout.setstate(std::ios_base::failbit);
-        gErrorIgnoreLevel = kFatal;
-    }
+    aMInterfaceGeomega() : MInterfaceGeomega() {}
 
     /**
  @brief Set geometry filename
@@ -89,12 +84,19 @@ Returns the total number of invalid geometries
 ```
 git submodule update --init --recursive --remote
 # Follow instructions to precompile pipeliningTools
-g++ checkGeometry.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -o checkGeometry $(root-config --cflags --glibs) -I$MEGALIB/include -L$MEGALIB/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc
+g++ checkGeometry.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -o checkGeometry $(root-config --cflags --libs) -I$MEGALIB/include -L$MEGALIB/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc
 ```
 
 */
 int main(int argc,char** argv){
     int overall = 0;
+
+    // Attempt to mostly quiet the tests
+    cout.setstate(ios_base::failbit);
+    cerr.setstate(ios_base::failbit);
+    gROOT->SetBatch(true);
+    mout.setstate(std::ios_base::failbit);
+    gErrorIgnoreLevel = kFatal;
 
     // Check each geometry, return number of failures
     for(int i=1;i<argc;i++){
