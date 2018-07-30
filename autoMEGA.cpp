@@ -153,6 +153,8 @@ int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
  filename will be empty after the test if it is invalid
 */
 void testGeometry(string& filename, string path){
+    std::cout.setstate(std::ios_base::failbit);
+    std::cerr.setstate(std::ios_base::failbit);
     int status, ret=system((path+"/checkGeometry "+filename+" &> /dev/null").c_str());
     status=WEXITSTATUS(ret); // Get return value
     if(status){
@@ -162,6 +164,8 @@ void testGeometry(string& filename, string path){
         statusBar[2]--;
     } else statusBar[1]++;
     currentThreadCount--;
+    std::cout.clear();
+    std::cerr.clear();
 }
 
 
@@ -578,6 +582,9 @@ int main(int argc,char** argv){
 
     if(config["revanSettings"]) revanSettings = config["revanSettings"].as<string>();
 
+    // Start status thread
+    thread statusThread(handleStatus);
+
     if(!hook.empty() && slackVerbosity>=3) slack("Starting Geomega stage.",hook);
     vector<string> geometries;
     if(config["geomega"]) if(geomegaSetup(config["geomega"],geometries)!=0) return 2;
@@ -590,8 +597,6 @@ int main(int argc,char** argv){
 
     // Start watchdog thread(s)
     thread watchdog0(storageWatchdog,2000);
-    // Start status thread
-    thread statusThread(handleStatus);
 
 
     // Create threadpool

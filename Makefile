@@ -8,7 +8,7 @@ all: clean init pipeline checkGeometry autoMEGA
 noMEGAlib: clean init pipeline autoMEGA
 
 init:
-		git submodule update --init --recursive
+		git submodule update --init --recursive --remote
 
 pipeline:
 		cd pipeliningTools; $(CC) -c pipeline.h $(MAIN_FLAGS)
