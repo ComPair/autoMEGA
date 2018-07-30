@@ -44,7 +44,7 @@ atomic<int> slackVerbosity(0);
 atomic<int> cosimaVerbosity(0);
 /// Array to store current state for status bar
 atomic<int> statusBar[9];
-/// Weighted average of simulation length
+/// Running average of simulation length
 chrono::seconds averageTime(0);
 /// semaphore for average time
 mutex timeLock;
@@ -69,7 +69,7 @@ void handleStatus(){
         if(statusBar[0]) currentStatus+="Geomega: ["+to_string(statusBar[1])+"/"+to_string(statusBar[2])+"] | ";
         if(statusBar[3]) currentStatus+="Cosima: ["+to_string(statusBar[4])+"/"+to_string(statusBar[5])+"] | ";
         if(statusBar[6]) currentStatus+="Revan: ["+to_string(statusBar[7])+"/"+to_string(statusBar[8])+"] | ";
-        if(averageTime.count()!=0) currentStatus+="Weighted average time: " + beautify_duration(averageTime) + " | ";
+        if(averageTime.count()!=0) currentStatus+="Running average time: " + beautify_duration(averageTime) + " | ";
         cout << currentStatus << spinner[i++%4]<< flush;
         if(!token.empty() && !channel.empty()) slackBotUpdate(token,channel,ts,currentStatus);
         usleep(400000);
@@ -600,7 +600,7 @@ int main(int argc,char** argv){
     YAML::Node config = YAML::LoadFile(settings);
     if(config["address"]) address = config["address"].as<string>();
     if(config["token"]) token = config["token"].as<string>();
-    if(config["channel"]) token = config["channel"].as<string>();
+    if(config["channel"]) channel = config["channel"].as<string>();
     if(config["keepAll"]) keepAll = config["keepAll"].as<bool>();
     if(config["slackVerbosity"]) slackVerbosity = config["slackVerbosity"].as<int>();
     if(config["cosimaVerbosity"]) cosimaVerbosity = config["cosimaVerbosity"].as<int>();
