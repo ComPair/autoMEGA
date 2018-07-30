@@ -153,7 +153,7 @@ int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
  filename will be empty after the test if it is invalid
 */
 void testGeometry(string& filename, string path){
-    int status, ret=system((path+"/checkGeometry "+filename+" &> /dev/null").c_str());
+    int status, ret=system((path+"/checkGeometry "+filename+" 2&>1 > /dev/null").c_str());
     status=WEXITSTATUS(ret); // Get return value
     if(status){
         cerr << "GEOMEGA: Geometry error in geometry \""+filename+"\". Removing geometry from list." << endl;
@@ -618,12 +618,12 @@ int main(int argc,char** argv){
     (void) tcsetattr(STDIN_FILENO, TCSANOW, &tty);
 
     // End timer, print command duration
+    exitFlag=1;
+    watchdog0.join();
+    statusThread.join();
     auto end = chrono::steady_clock::now();
     cout << endl << "Total simulation and analysis elapsed time: " << beautify_duration(chrono::duration_cast<chrono::seconds>(end-start)) << endl;
     if(!hook.empty()) slack("Simulation complete",hook);
     if(!address.empty()) email(address,"Simulation Complete");
-    exitFlag=1;
-    watchdog0.join();
-    statusThread.join();
     return 0;
 }

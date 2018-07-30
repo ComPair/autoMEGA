@@ -1,7 +1,7 @@
 CC=g++
 
 MAIN_FLAGS=-std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall
-MEGALIB_FLAGS=`root-config --cflags --glibs` -I$(MEGALIB)/include -L$(MEGALIB)/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc
+MEGALIB_FLAGS=`root-config --cflags --libs` -I$(MEGALIB)/include -L$(MEGALIB)/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc
 
 all: clean init pipeline checkGeometry autoMEGA
 
@@ -20,4 +20,4 @@ autoMEGA:
 		$(CC) autoMEGA.cpp -o autoMEGA $(MAIN_FLAGS)
 
 clean:
-		rm -f autoMEGA checkGeometry *.legend *.out *.geo.setup *.source
+		rm -f autoMEGA checkGeometry *.legend *.out
