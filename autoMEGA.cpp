@@ -50,8 +50,8 @@ void handleStatus(){
     while(!exitFlag){
         sleep(1);
         string currentStatus = "\r";
-        if(statusBar[0]) currentStatus+="Geomega: ["+to_string(statusBar[1])+"/"+to_string(statusBar[2])+"]";
-        if(statusBar[3]) currentStatus+="Cosima: ["+to_string(statusBar[4])+"/"+to_string(statusBar[5])+"]";
+        if(statusBar[0]) currentStatus+="Geomega: ["+to_string(statusBar[1])+"/"+to_string(statusBar[2])+"] | ";
+        if(statusBar[3]) currentStatus+="Cosima: ["+to_string(statusBar[4])+"/"+to_string(statusBar[5])+"] | ";
         if(statusBar[6]) currentStatus+="Revan: ["+to_string(statusBar[7])+"/"+to_string(statusBar[8])+"]";
         cout << currentStatus;
     }
@@ -545,12 +545,6 @@ int main(int argc,char** argv){
     auto start = chrono::steady_clock::now();
     for(int i=0;i<9;i++)statusBar[i]=0;
 
-    // Disable echo
-    struct termios tty;
-    tcgetattr(STDIN_FILENO, &tty);
-    tty.c_lflag &= ~ECHO;
-    (void) tcsetattr(STDIN_FILENO, TCSANOW, &tty);
-
     // Parse command line arguments
     for(int i=0;i<argc;i++){
         if(i<argc-1) if(string(argv[i])=="--settings") settings = argv[++i];
@@ -566,6 +560,12 @@ int main(int argc,char** argv){
 
     // Check directory
     if(directoryEmpty(".")) return 3;
+
+    // Disable echo
+    struct termios tty;
+    tcgetattr(STDIN_FILENO, &tty);
+    tty.c_lflag &= ~ECHO;
+    (void) tcsetattr(STDIN_FILENO, TCSANOW, &tty);
 
     // Parse config file
     YAML::Node config = YAML::LoadFile(settings);
