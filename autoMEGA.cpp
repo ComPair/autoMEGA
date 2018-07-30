@@ -21,7 +21,9 @@ string settings = "config.yaml";
 /// Revan settings file (defaults to revan default)
 string revanSettings = "~/.revan.cfg";
 /// Slack hook (if empty, slack notifications are disabled)
-string hook = "";
+string token = "";
+/// Slack channel
+string channel = "";
 /// Email address for notifications (if empty, email notifications are disabled)
 string address = "";
 /// Maximum threads to use for simulations (defaults to system thread count)
@@ -42,21 +44,43 @@ atomic<int> slackVerbosity(0);
 atomic<int> cosimaVerbosity(0);
 /// Array to store current state for status bar
 atomic<int> statusBar[9];
+/// Weighted average of simulation length
+chrono::seconds averageTime(0);
+/// semaphore for average time
+mutex timeLock;
 
 /**
  @brief Print simulation status bar
+
+ ## Print simulation status bar
+
+ ### Notes
+ Constructs status and adds a spinner to indicate that the simulation is still alive. Prints the same message to slack.
+
+ Also prints it to slack, and updates it
 */
 void handleStatus(){
     char spinner[4] = {'-','\\','|','/'};
     unsigned int i=0;
+    string ts = "";
+    if(!token.empty() && !channel.empty()) ts=slackBotPost(token,channel,">J.A.R.V.I.S., are you up?\nFor you sir, always.");
     while(!exitFlag){
-        usleep(400000);
         string currentStatus = "\r";
         if(statusBar[0]) currentStatus+="Geomega: ["+to_string(statusBar[1])+"/"+to_string(statusBar[2])+"] | ";
         if(statusBar[3]) currentStatus+="Cosima: ["+to_string(statusBar[4])+"/"+to_string(statusBar[5])+"] | ";
         if(statusBar[6]) currentStatus+="Revan: ["+to_string(statusBar[7])+"/"+to_string(statusBar[8])+"] | ";
+        if(averageTime.count()==0) currentStatus+="Weighted average time: " + beautify_duration(averageTime) + " | ";
         cout << currentStatus << spinner[i++%4]<< flush;
+        if(!token.empty() && !channel.empty()) slackBotUpdate(token,channel,ts,currentStatus);
+        usleep(400000);
     }
+}
+
+/**
+ @brief Quick alias for slack notifications
+*/
+void quickSlack(string message){
+    if(!token.empty() && !channel.empty()) slackBotPost(token,channel,message);
 }
 
 /**
@@ -106,7 +130,7 @@ vector<string> parseIterativeNode(YAML::Node contents, std::string prepend=""){
 int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
     if(recursionDepth>1024){
         cerr << "Exceeded max recursion depth of 1024. This is likely due to a circular dependency. If not, then your geometry is way to complex. Exiting." << endl;
-        if(!hook.empty() && slackVerbosity>=1) slack("GEOMERGE: Exceeded max recursion depth of 1024. This is likely due to a circular dependency. If not, then your geometry is way to complex. Exiting.",hook);
+        if(slackVerbosity>=1) quickSlack("GEOMERGE: Exceeded max recursion depth of 1024. This is likely due to a circular dependency. If not, then your geometry is way to complex. Exiting.");
         return -1;
     }
     if(recursionDepth==0) out << "///Include " << inputFile << "\n"; // Note initial file
@@ -115,7 +139,7 @@ int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
     ifstream input(inputFile);
     if(!input.is_open() || !input.good()){
         cerr << "Could not open included file \"" << inputFile << "\"." << endl;
-        if(!hook.empty() && slackVerbosity>=1) slack("GEOMERGE: Could not open included file \"" + inputFile + "\".",hook);
+        if(slackVerbosity>=1) quickSlack("GEOMERGE: Could not open included file \"" + inputFile + "\".");
         return 1;
     }
 
@@ -159,7 +183,7 @@ void testGeometry(string& filename, string path){
     status=WEXITSTATUS(ret); // Get return value
     if(status){
         cerr << "GEOMEGA: Geometry error in geometry \""+filename+"\". Removing geometry from list." << endl;
-        if(!hook.empty() && slackVerbosity>=1) slack("GEOMEGA: Geometry error in geometry \""+filename+"\". Removing geometry from list.",hook);
+        if(slackVerbosity>=1) quickSlack("GEOMEGA: Geometry error in geometry \""+filename+"\". Removing geometry from list.");
         filename="";
         statusBar[2]--;
     } else statusBar[1]++;
@@ -188,7 +212,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
 
     // Merge all files together
     ofstream baseGeometry("g.geo.setup");
-    if(!baseGeometry.is_open()){ cerr << "Could not create new base geometry file. Exiting" << endl; if(!hook.empty() && slackVerbosity>=1) slack("GEOMEGA SETUP: Could not create new base geometry file. Exiting.",hook); return 3;}
+    if(!baseGeometry.is_open()){ cerr << "Could not create new base geometry file. Exiting" << endl; if(slackVerbosity>=1) quickSlack("GEOMEGA SETUP: Could not create new base geometry file. Exiting."); return 3;}
     if(geoMerge(geomega["filename"].as<string>(),baseGeometry)) return 1;
     baseGeometry.close();
 
@@ -243,7 +267,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
                     // Make sure we found the file
                     if(!foundFile){
                         cerr << "Attempted to alter line number past end of file. File: \""+files[i]+"\". Exiting." << endl;
-                        if(!hook.empty() && slackVerbosity>=1) slack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i],hook);
+                        if(slackVerbosity>=1) quickSlack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i]);
                         return 5;
                     }
 
@@ -261,7 +285,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
                                 // Check we havent passed "///End "+files[i]
                                 if(line=="///End "+files[i]){
                                     cerr << "Attempted to alter line number past end of file. File: \""+files[i]+"\". Exiting." << endl;
-                                    if(!hook.empty() && slackVerbosity>=1) slack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i],hook);
+                                    if(slackVerbosity>=1) quickSlack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i]);
                                     return 4;
                                 }
                                 if(line=="///End "+file) break;
@@ -270,7 +294,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
                         // Check we havent passed "///End "+files[i]
                         if(line=="///End "+files[i]){
                             cerr << "Attempted to alter line number past end of file. File: \""+files[i]+"\". Exiting." << endl;
-                            if(!hook.empty()&&slackVerbosity>=1) slack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i],hook);
+                            if(slackVerbosity>=1) quickSlack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i]);
                             return 4;
                         }
                     }
@@ -351,7 +375,7 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
     // Make sure config file exists
     if(!fileExists(baseFileName)){
         cerr << "File \"" << baseFileName << "\" does not exist, but was requested. Exiting."<< endl;
-        if(!hook.empty() && slackVerbosity>=1) slack("COSIMA SETUP: File \"" + baseFileName + "\" does not exist, but was requested. Exiting.",hook);
+        if(slackVerbosity>=1) quickSlack("COSIMA SETUP: File \"" + baseFileName + "\" does not exist, but was requested. Exiting.");
         return 1;
     }
 
@@ -429,7 +453,6 @@ void runSimulation(const string source, const int threadNumber){
 
     // Get seed
     uint32_t seed = random_seed<uint32_t>(1);
-    if(!hook.empty() && slackVerbosity>=3) slack("Starting run "+to_string(threadNumber)+".", hook);
 
     // Create legend
     legendLock.lock();
@@ -442,7 +465,7 @@ void runSimulation(const string source, const int threadNumber){
     ifstream sourceFile(source);
     string geoSetup;
     while(!sourceFile.eof() && geoSetup!="Geometry") sourceFile>>geoSetup;
-    if(geoSetup!="Geometry"){cerr << "Cannot locate geometry file. Exiting." << endl; if(!hook.empty() && slackVerbosity>=1) slack("RUN SIMULATION"+to_string(threadNumber)+": Cannot locate geometry file.",hook); return;}
+    if(geoSetup!="Geometry"){cerr << "Cannot locate geometry file. Exiting." << endl; if(slackVerbosity>=1) quickSlack("RUN SIMULATION"+to_string(threadNumber)+": Cannot locate geometry file."); return;}
     sourceFile>>geoSetup;
     sourceFile.close();
 
@@ -452,14 +475,14 @@ void runSimulation(const string source, const int threadNumber){
         int status, ret=system(("bash -c \"source ${MEGALIB}/bin/source-megalib.sh; cosima -v "+to_string(cosimaVerbosity)+" -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz; exit $?\"").c_str());
         status=WEXITSTATUS(ret); // Get return value
         if(status){
-            slack("Run "+to_string(threadNumber)+" failed.", hook);
+            quickSlack("Run "+to_string(threadNumber)+" failed.");
             return;
         }
         statusBar[4]++;
         ret=system(("bash -c \"source ${MEGALIB}/bin/source-megalib.sh; revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".*.sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz; exit $?\"").c_str());
         status=WEXITSTATUS(ret); // Get return value
         if(status){
-            slack("Run "+to_string(threadNumber)+" failed.", hook);
+            quickSlack("Run "+to_string(threadNumber)+" failed.");
             return;
         }
         statusBar[7]++;
@@ -470,11 +493,14 @@ void runSimulation(const string source, const int threadNumber){
         if(!keepAll) cout << "rm run"+to_string(threadNumber)+".*.sim.gz\n";
     }
 
-    // End timer
+    // End timer, calculate new average time
     auto end = chrono::steady_clock::now();
+    chrono::seconds thisTime = chrono::duration_cast<chrono::seconds>(end-start);
+    timeLock.lock();
+    averageTime = (averageTime*maxThreads+thisTime)/(maxThreads+1);
+    timeLock.unlock();
     // Cleanup and exit
     currentThreadCount--;
-    if(!hook.empty() && slackVerbosity>=2) slack("Run "+to_string(threadNumber)+" complete. Elapsed time: "+ beautify_duration(chrono::duration_cast<chrono::seconds>(end-start))+".", hook);
     return;
 }
 
@@ -491,7 +517,8 @@ Most settings are only configurable from the yaml configuration file. The format
 
 autoMEGA settings:
  - `address` - Email to send an email to when done (relies on sendmail). If not present, email notifications are disabled. Note: depends on a system call to sendmail, so it may not work on all systems.
- - `hook` - Slack webhook to send notification to when done. If not present, slack notifications are disabled.
+ - `token` - Slack OAuth2 token to send notification when done. If not present, slack notifications are disabled.
+ - `Channel` - Slack channel to send notification when done. If not present, slack notifications are disabled.
  - `maxThreads` - Maximum threads to use (defaults to system threads if not given)
  - `keepAll` - Flag to keep intermediary files (defaults to off = 0)
 General settings files:
@@ -556,7 +583,7 @@ int main(int argc,char** argv){
     // Make sure config file exists
     if(!fileExists(settings)){
         cerr << "File \"" << settings << "\" does not exist, but was requested. Exiting."<< endl;
-        if(!hook.empty()) slack("MAIN: File \"" + settings + "\" does not exist, but was requested. Exiting.",hook);
+        quickSlack("MAIN: File \"" + settings + "\" does not exist, but was requested. Exiting.");
         return 1;
     }
 
@@ -572,7 +599,8 @@ int main(int argc,char** argv){
     // Parse config file
     YAML::Node config = YAML::LoadFile(settings);
     if(config["address"]) address = config["address"].as<string>();
-    if(config["hook"]) hook = config["hook"].as<string>();
+    if(config["token"]) token = config["token"].as<string>();
+    if(config["channel"]) token = config["channel"].as<string>();
     if(config["keepAll"]) keepAll = config["keepAll"].as<bool>();
     if(config["slackVerbosity"]) slackVerbosity = config["slackVerbosity"].as<int>();
     if(config["cosimaVerbosity"]) cosimaVerbosity = config["cosimaVerbosity"].as<int>();
@@ -582,11 +610,11 @@ int main(int argc,char** argv){
     // Start status thread
     thread statusThread(handleStatus);
 
-    if(!hook.empty() && slackVerbosity>=3) slack("Starting Geomega stage.",hook);
+    if(slackVerbosity>=3) quickSlack("Starting Geomega stage.");
     vector<string> geometries;
     if(config["geomega"]) if(geomegaSetup(config["geomega"],geometries)!=0) return 2;
 
-    if(!hook.empty() && slackVerbosity>=3) slack("Starting Cosima parsing stage",hook);
+    if(slackVerbosity>=3) quickSlack("Starting Cosima parsing stage");
     vector<string> sources;
     if(config["cosima"]) if(cosimaSetup(config["cosima"],sources,geometries)!=0) return 3;
 
@@ -600,7 +628,7 @@ int main(int argc,char** argv){
     thread watchdog0(storageWatchdog,2000);
 
     // Calculate total number of simulations
-    if(!hook.empty() && slackVerbosity>=3) slack("Starting all simulations",hook);
+    if(slackVerbosity>=3) quickSlack("Starting all simulations");
 
     // Start all simulation threads.
     for(size_t i=0;i<sources.size();i++){
@@ -623,7 +651,7 @@ int main(int argc,char** argv){
     statusThread.join();
     auto end = chrono::steady_clock::now();
     cout << endl << "Total simulation and analysis elapsed time: " << beautify_duration(chrono::duration_cast<chrono::seconds>(end-start)) << endl;
-    if(!hook.empty()) slack("Simulation complete. Elapsed time: "+beautify_duration(chrono::duration_cast<chrono::seconds>(end-start)),hook);
+    quickSlack("Simulation complete. Elapsed time: "+beautify_duration(chrono::duration_cast<chrono::seconds>(end-start)));
     if(!address.empty()) email(address,"Simulation Complete. Elapsed time: "+beautify_duration(chrono::duration_cast<chrono::seconds>(end-start)));
     return 0;
 }
