@@ -68,8 +68,8 @@ void handleStatus(){
         if(statusBar[3]) currentStatus << std::setprecision(3) << "Cosima: " << ((double) statusBar[4]*100)/statusBar[5] << "% ["+to_string(statusBar[4])+"/"+to_string(statusBar[5])+"] | ";
         if(statusBar[6]) currentStatus << std::setprecision(3) << "Revan: " << ((double) statusBar[7]*100)/statusBar[8] << "% ["+to_string(statusBar[7])+"/"+to_string(statusBar[8])+"] | ";
         if(averageTime.count()!=0) currentStatus << "Running average time: " + beautify_duration(averageTime) + " | ";
-        cout << "\r" << currentStatus.str() << spinner[i++%4] << "                          " << flush;
-        if(i%12==0 && !token.empty() && !channel.empty()) slackBotUpdate(token,channel,ts,currentStatus.str()+spinner[i++%4]);
+        cout << "\r" << currentStatus.str() << spinner[i++%4] << "        " << flush;
+        if(i%11==0 && !token.empty() && !channel.empty()) slackBotUpdate(token,channel,ts,currentStatus.str()+spinner[i++%4]);
         usleep(400000);
     }
 }
