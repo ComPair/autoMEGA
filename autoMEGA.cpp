@@ -388,21 +388,21 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
     }
     string timing[2] = {"",""};
     if(cosima["events"]){
-        if(timing[0]=="") {timing[0]="\\.Events"; timing[1]=cosima["events"].as<string>();}
+        if(timing[0]=="") {timing[0]="Events"; timing[1]=cosima["events"].as<string>();}
         else {
             if(slackVerbosity>=1) quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.");
             return 1;
         }
     }
     if(cosima["triggers"]){
-        if(timing[0]=="") {timing[0]="\\.Triggers"; timing[1]=cosima["triggers"].as<string>();}
+        if(timing[0]=="") {timing[0]="Triggers"; timing[1]=cosima["triggers"].as<string>();}
         else {
             if(slackVerbosity>=1) quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.");
             return 1;
         }
     }
     if(cosima["time"]){
-        if(timing[0]=="") {timing[0]="\\.Time"; timing[1]=cosima["time"].as<string>();}
+        if(timing[0]=="") {timing[0]="Time"; timing[1]=cosima["time"].as<string>();}
         else {
             if(slackVerbosity>=1) quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.");
             return 1;
@@ -450,8 +450,8 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
 
         if(!timing[0].empty()){
             // Update Triggers, Events, or Time
-            regex t(timing[0]+".*\n");
-            updated = regex_replace(updated,t,timing[0]+" "+timing[1]+"\n");
+            regex t("\.?"+timing[0]+".*\n");
+            updated = regex_replace(updated,t,"\."+timing[0]+" "+timing[1]+"\n");
         }
 
         out << updated;
