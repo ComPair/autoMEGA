@@ -56,21 +56,19 @@ mutex timeLock;
 
  ### Notes
  Constructs status and adds a spinner to indicate that the simulation is still alive. Prints the same message to slack.
-
- Also prints it to slack, and updates it
 */
 void handleStatus(){
     char spinner[4] = {'-','\\','|','/'};
     unsigned int i=0;
     string ts = "";
-    if(!token.empty() && !channel.empty()) ts=slackBotPost(token,channel,">J.A.R.V.I.S., are you up?\nFor you sir, always.");
+    if(!token.empty() && !channel.empty()) ts=slackBotPost(token,channel,"> J.A.R.V.I.S., are you up?\nFor you sir, always.");
     while(!exitFlag){
         stringstream currentStatus;
         if(statusBar[0]) currentStatus << std::setprecision(3) << "Geomega: " << ((double) statusBar[1]*100)/statusBar[2] << "% ["+to_string(statusBar[1])+"/"+to_string(statusBar[2])+"] | ";
         if(statusBar[3]) currentStatus << std::setprecision(3) << "Cosima: " << ((double) statusBar[4]*100)/statusBar[5] << "% ["+to_string(statusBar[4])+"/"+to_string(statusBar[5])+"] | ";
         if(statusBar[6]) currentStatus << std::setprecision(3) << "Revan: " << ((double) statusBar[7]*100)/statusBar[8] << "% ["+to_string(statusBar[7])+"/"+to_string(statusBar[8])+"] | ";
         if(averageTime.count()!=0) currentStatus << "Running average time: " + beautify_duration(averageTime) + " | ";
-        cout << "\r" << currentStatus.str() << spinner[i++%4] << "\t\t" << flush;
+        cout << "\r" << currentStatus.str() << spinner[i++%4] << "     " << flush;
         if(i%3==0 && !token.empty() && !channel.empty()) slackBotUpdate(token,channel,ts,currentStatus.str());
         usleep(400000);
     }
@@ -386,6 +384,7 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
         if(it->second["spectrum"]) options[it->second["source"].as<string>()+".Spectrum"] = parseIterativeNode(it->second["spectrum"],it->second["source"].as<string>()+".Spectrum");
         if(it->second["flux"]) options[it->second["source"].as<string>()+".Flux"] = parseIterativeNode(it->second["flux"],it->second["source"].as<string>()+".Flux");
         if(it->second["polarization"]) options[it->second["source"].as<string>()+".Polarization"] = parseIterativeNode(it->second["polarization"],it->second["source"].as<string>()+".Polarization");
+        if(it->second["particleType"]) options[it->second["source"].as<string>()+".ParticleType"] = parseIterativeNode(it->second["particleType"],it->second["source"].as<string>()+".ParticleType");
     }
     if(geometries.size()!=0){
         for(auto& g : geometries) g = "Geometry "+g;
