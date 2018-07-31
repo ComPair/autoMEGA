@@ -387,22 +387,22 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
         if(it->second["particleType"]) options[it->second["source"].as<string>()+".ParticleType"] = parseIterativeNode(it->second["particleType"],it->second["source"].as<string>()+".ParticleType");
     }
     string timing[2] = {"",""};
-    if(cosima["Events"]){
-        if(timing[0]=="") {timing[0]=".Events"; timing[1]=cosima["Events"].as<string>();}
+    if(cosima["events"]){
+        if(timing[0]=="") {timing[0]=".Events"; timing[1]=cosima["events"].as<string>();}
         else {
             if(slackVerbosity>=1) quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.");
             return 1;
         }
     }
-    if(cosima["Triggers"]){
-        if(timing[0]=="") {timing[0]=".Triggers"; timing[1]=cosima["Triggers"].as<string>();}
+    if(cosima["triggers"]){
+        if(timing[0]=="") {timing[0]=".Triggers"; timing[1]=cosima["triggers"].as<string>();}
         else {
             if(slackVerbosity>=1) quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.");
             return 1;
         }
     }
-    if(cosima["Time"]){
-        if(timing[0]=="") {timing[0]=".Time"; timing[1]=cosima["Time"].as<string>();}
+    if(cosima["time"]){
+        if(timing[0]=="") {timing[0]=".Time"; timing[1]=cosima["time"].as<string>();}
         else {
             if(slackVerbosity>=1) quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.");
             return 1;
@@ -446,10 +446,15 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
         ofstream out(filename);
         // Fix output filename
         regex e(".FileName.*\n");
+        string updated = regex_replace(alteredSources[i],e,".FileName run"+to_string(i)+"\n");
 
-        // Update Triggers, Events, or Time
-        regex t(timing[0]+".*\n");
-        out << regex_replace(regex_replace(alteredSources[i],e,".FileName run"+to_string(i)+"\n"),t,timing[0]+" "+timing[1]+"\n");
+        if(!timing[0].empty()){
+            // Update Triggers, Events, or Time
+            regex t(timing[0]+".*\n");
+            updated = regex_replace(updated,t,timing[0]+" "+timing[1]+"\n");
+        }
+
+        out << updated;
         out.close();
     }
 
