@@ -518,7 +518,7 @@ Most settings are only configurable from the yaml configuration file. The format
 autoMEGA settings:
  - `address` - Email to send an email to when done (relies on sendmail). If not present, email notifications are disabled. Note: depends on a system call to sendmail, so it may not work on all systems.
  - `token` - Slack OAuth2 token to send notification when done. If not present, slack notifications are disabled.
- - `Channel` - Slack channel to send notification when done. If not present, slack notifications are disabled.
+ - `channel` - Slack channel to send notification when done. (See slack API for how to obtain slack channel code, format `C12345678`). If not present, slack notifications are disabled.
  - `maxThreads` - Maximum threads to use (defaults to system threads if not given)
  - `keepAll` - Flag to keep intermediary files (defaults to off = 0)
 General settings files:
