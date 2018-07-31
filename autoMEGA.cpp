@@ -386,6 +386,28 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
         if(it->second["polarization"]) options[it->second["source"].as<string>()+".Polarization"] = parseIterativeNode(it->second["polarization"],it->second["source"].as<string>()+".Polarization");
         if(it->second["particleType"]) options[it->second["source"].as<string>()+".ParticleType"] = parseIterativeNode(it->second["particleType"],it->second["source"].as<string>()+".ParticleType");
     }
+    string timing[2] = {"",""};
+    if(cosima["Events"]){
+        if(timing[0]=="") {timing[0]=".Events"; timing[1]=cosima["Events"].as<string>();}
+        else {
+            if(slackVerbosity>=1) quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.");
+            return 1;
+        }
+    }
+    if(cosima["Triggers"]){
+        if(timing[0]=="") {timing[0]=".Triggers"; timing[1]=cosima["Triggers"].as<string>();}
+        else {
+            if(slackVerbosity>=1) quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.");
+            return 1;
+        }
+    }
+    if(cosima["Time"]){
+        if(timing[0]=="") {timing[0]=".Time"; timing[1]=cosima["Time"].as<string>();}
+        else {
+            if(slackVerbosity>=1) quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.");
+            return 1;
+        }
+    }
     if(geometries.size()!=0){
         for(auto& g : geometries) g = "Geometry "+g;
         options["Geometry"] = geometries;
@@ -423,8 +445,11 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
         sources.push_back(filename);
         ofstream out(filename);
         // Fix output filename
-        regex e(".FileName .*\n");
-        out << regex_replace(alteredSources[i],e,".FileName run"+to_string(i)+"\n");;
+        regex e(".FileName.*\n");
+
+        // Update Triggers, Events, or Time
+        regex t(timing[0]+".*\n");
+        out << regex_replace(regex_replace(alteredSources[i],e,".FileName run"+to_string(i)+"\n"),t,timing[0]+" "+timing[1]+"\n");
         out.close();
     }
 
@@ -535,6 +560,9 @@ If the array is a double array of values, those are taken as the literal values 
 
 Cosima settings:
  - `filename` - Base cosima .source file
+ - `triggers` - Number of triggers to run. Conflicts with "events" and "time". Single value. Optional.
+ - `events` - Number of events to run. Conflicts with "triggers" and "time". Single value. Optional.
+ - `time` - Simulation time to run (not wall time). Conflicts with "events" and "triggers". Single value. Optional.
  - `parameters` - Array of parameters, formatted as such:
     - `source` - Name of the source to modify
     - `beam` - Beam settings: Array of values in the standard format, to be separated by spaces in the file. (Optional, if not present, then it is not modified from the base file).

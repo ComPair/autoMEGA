@@ -22,6 +22,9 @@
 
   cosima: # Optional, comment out or remove entire block if you wish to remove.
     filename: "run.source" # Base filename is required if cosima section is present. Otherwise a parser error will be thrown
+    triggers: 10000 # Number of triggers. Optional, and conflicts with "events" or "time"
+#    events: 10000 # Number of triggers. Optional, and conflicts with "triggers" or "time"
+#    time: 10000 # Number of triggers. Optional, and conflicts with "events" or "triggers"
     parameters: # Optional
       0: # Node name is unimportant. Note that the below options will only alter existing lines in the source file, they will not add additional lines as that would create undefined behavior
         source: "Pos" # Single string for source name, required if any other options are present.
@@ -29,3 +32,4 @@
         spectrum: [[["Mono"]],[[31,100,316,1000,3162,10000,31622,100000,316228,1000000,3162277,10000000]]] # Standard format for everything after "<Source>.Spectrum ". Optional.
         flux: [[[1000]]] # Standard format for everything after "<Source>.Flux ". Optional.
         polarization: [[["true"]],[[1.0]],[[0.0]],[[0.0]],[[1.0]]] # Standard format for everything after "<Source>.Polarization ". Optional.
+        particleType: [[[1]]] # Standard format for everything after "<Source>.ParticleType ". Optional.
