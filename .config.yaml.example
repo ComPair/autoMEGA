@@ -1,6 +1,7 @@
 --- # Note that autoMEGA will exit if the file is not valid YAML.
   address: "person@example.com" # Depends on sendmail configuration
-  hook: "https://hooks.slack.com/services/INSERT/WEBHOOK/HERE" # Obtain link from slack integration
+  token: "xoxb-0000000000-00000000000-XXXXXXXXXXXXXXXXXXXXXXXX" # Obtain oath2 token from slack integration
+  channel: "C12345678" # Channel name - obtain by right clicking on channel, and copy the link to it. The code at the end of the link should be the channel code. Make sure the bot has access to this channel.
   maxThreads: 24 # If undefined, autoMEGA will attempt to determine number of threads available, and use that instead
   keepAll: false # If true, then *.sim.gz files are saved. Otherwise they are deleted to save storage space
   slackVerbosity: 3 # Level 3 prints all messages, level 2 prints fewer messages, level one prints only error messages, and level zero only prints final messages. Defaults to zero
@@ -26,5 +27,5 @@
         source: "Pos" # Single string for source name, required if any other options are present.
         beam: [[["FarFieldPointSource"]],[0,180,10],[0,360,10]] # Standard format for everything after "<Source>.Beam ". Optional.
         spectrum: [[["Mono"]],[[31,100,316,1000,3162,10000,31622,100000,316228,1000000,3162277,10000000]]] # Standard format for everything after "<Source>.Spectrum ". Optional.
-        flux: [[[1000]]] # Standard format for everything after "<Source>.Flux ". Optional
+        flux: [[[1000]]] # Standard format for everything after "<Source>.Flux ". Optional.
         polarization: [[["true"]],[[1.0]],[[0.0]],[[0.0]],[[1.0]]] # Standard format for everything after "<Source>.Polarization ". Optional.
