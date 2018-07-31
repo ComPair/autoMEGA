@@ -450,7 +450,7 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
 
         if(!timing[0].empty()){
             // Update Triggers, Events, or Time
-            regex t("\.?"+timing[0]+".*\n");
+            regex t("\\..?"+timing[0]+".*\n");
             updated = regex_replace(updated,t,"\."+timing[0]+" "+timing[1]+"\n");
         }
 
