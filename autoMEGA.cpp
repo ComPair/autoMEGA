@@ -653,7 +653,7 @@ int main(int argc,char** argv){
 
     // Create threadpool
     vector<thread> threadpool;
-    cout << "\rUsing " << maxThreads << " threads.                                                     " << endl;
+    cout << "Using "+to_string(maxThreads)+" threads.\nTo pause:\nkill -STOP "+to_string(getpid())+"\nTo continue:\nkill -CONT "+to_string(getpid())+"\n" << endl;
     legend.open("run.legend");
 
     // Start watchdog thread(s)
