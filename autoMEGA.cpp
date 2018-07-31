@@ -68,7 +68,7 @@ void handleStatus(){
         if(statusBar[3]) currentStatus << std::setprecision(3) << "Cosima: " << ((double) statusBar[4]*100)/statusBar[5] << "% ["+to_string(statusBar[4])+"/"+to_string(statusBar[5])+"] | ";
         if(statusBar[6]) currentStatus << std::setprecision(3) << "Revan: " << ((double) statusBar[7]*100)/statusBar[8] << "% ["+to_string(statusBar[7])+"/"+to_string(statusBar[8])+"] | ";
         if(averageTime.count()!=0) currentStatus << "Running average time: " + beautify_duration(averageTime) + " | ";
-        cout << "\r" << currentStatus.str() << spinner[i++%4] << "     " << flush;
+        cout << "\r" << currentStatus.str() << spinner[i++%4] << "                          " << flush;
         if(i%3==0 && !token.empty() && !channel.empty()) slackBotUpdate(token,channel,ts,currentStatus.str());
         usleep(400000);
     }
@@ -388,21 +388,21 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
     }
     string timing[2] = {"",""};
     if(cosima["events"]){
-        if(timing[0]=="") {timing[0]=".Events"; timing[1]=cosima["events"].as<string>();}
+        if(timing[0]=="") {timing[0]="\\.Events"; timing[1]=cosima["events"].as<string>();}
         else {
             if(slackVerbosity>=1) quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.");
             return 1;
         }
     }
     if(cosima["triggers"]){
-        if(timing[0]=="") {timing[0]=".Triggers"; timing[1]=cosima["triggers"].as<string>();}
+        if(timing[0]=="") {timing[0]="\\.Triggers"; timing[1]=cosima["triggers"].as<string>();}
         else {
             if(slackVerbosity>=1) quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.");
             return 1;
         }
     }
     if(cosima["time"]){
-        if(timing[0]=="") {timing[0]=".Time"; timing[1]=cosima["time"].as<string>();}
+        if(timing[0]=="") {timing[0]="\\.Time"; timing[1]=cosima["time"].as<string>();}
         else {
             if(slackVerbosity>=1) quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.");
             return 1;
@@ -653,7 +653,7 @@ int main(int argc,char** argv){
 
     // Create threadpool
     vector<thread> threadpool;
-    cout << "\rUsing " << maxThreads << " threads.\t\t\t\t\t\t" << endl;
+    cout << "\rUsing " << maxThreads << " threads.                                                     " << endl;
     legend.open("run.legend");
 
     // Start watchdog thread(s)
