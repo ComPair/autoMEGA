@@ -20,7 +20,7 @@ Features:
 The library is currently in a early release state. Bug reports and feature requests welcome!
 
 ### Dependencies:
-- MEGAlib
+- MEGAlib (Tested on v2.34)
 - YAML-cpp
 - [pipeliningTools](https://gitlab.com/cbray/pipeliningTools)
 
