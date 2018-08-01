@@ -390,6 +390,7 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
     if(cosima["events"]){
         if(timing[0]=="") {timing[0]="Events"; timing[1]=cosima["events"].as<string>();}
         else {
+            cerr << "COSIMA SETUP: Multiple timing definitions. Exiting." << endl;
             if(slackVerbosity>=1) quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.");
             return 1;
         }
@@ -397,6 +398,7 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
     if(cosima["triggers"]){
         if(timing[0]=="") {timing[0]="Triggers"; timing[1]=cosima["triggers"].as<string>();}
         else {
+            cerr << "COSIMA SETUP: Multiple timing definitions. Exiting." << endl;
             if(slackVerbosity>=1) quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.");
             return 1;
         }
@@ -404,6 +406,7 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
     if(cosima["time"]){
         if(timing[0]=="") {timing[0]="Time"; timing[1]=cosima["time"].as<string>();}
         else {
+            cerr << "COSIMA SETUP: Multiple timing definitions. Exiting." << endl;
             if(slackVerbosity>=1) quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.");
             return 1;
         }
@@ -639,6 +642,14 @@ int main(int argc,char** argv){
     if(config["revanSettings"]) revanSettings = config["revanSettings"].as<string>();
     if(config["maxThreads"]) maxThreads = config["maxThreads"].as<int>();
 
+    // Create threadpool
+    vector<thread> threadpool;
+    cout << "Using "+to_string(maxThreads)+" threads.\nTo pause:\nkill -STOP -"+to_string(getpid())+"\nTo continue:\nkill -CONT -"+to_string(getpid())+"\n" << endl;
+    legend.open("run.legend");
+
+    // Start watchdog thread(s)
+    thread watchdog0(storageWatchdog,2000);
+
     // Start status thread
     thread statusThread(handleStatus);
 
@@ -649,15 +660,6 @@ int main(int argc,char** argv){
     if(slackVerbosity>=3) quickSlack("Starting Cosima parsing stage");
     vector<string> sources;
     if(config["cosima"]) if(cosimaSetup(config["cosima"],sources,geometries)!=0) return 3;
-
-
-    // Create threadpool
-    vector<thread> threadpool;
-    cout << "Using "+to_string(maxThreads)+" threads.\nTo pause:\nkill -STOP -"+to_string(getpid())+"\nTo continue:\nkill -CONT -"+to_string(getpid())+"\n" << endl;
-    legend.open("run.legend");
-
-    // Start watchdog thread(s)
-    thread watchdog0(storageWatchdog,2000);
 
     // Calculate total number of simulations
     if(slackVerbosity>=3) quickSlack("Starting all simulations");
