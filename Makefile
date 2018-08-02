@@ -18,7 +18,7 @@ autoMEGA:
 		$(CC) autoMEGA.cpp -o autoMEGA $(MAIN_FLAGS)
 
 debug-autoMEGA:
-		git clone https://github.com/bombela/backward-cpp
+		if [ ! -d "backward-cpp" ] ; then git clone https://github.com/bombela/backward-cpp; fi
 		$(CC) autoMEGA.cpp -o autoMEGA $(MAIN_FLAGS) -g -ldw -D DEBUG
 
 clean:

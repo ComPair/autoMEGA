@@ -20,7 +20,7 @@ pages:
       - master
   stage: deploy
   script:
-    - apt update && apt -y install make g++ doxygen doxygen-doc doxygen-latex doxygen-gui libyaml-cpp-dev
+    - apt update && apt -y install make autoconf g++ doxygen doxygen-doc doxygen-latex doxygen-gui libyaml-cpp-dev
     - git submodule update --init --recursive --remote
     - doxygen Doxyfile
   artifacts:
