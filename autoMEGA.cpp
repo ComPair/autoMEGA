@@ -602,7 +602,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
     vector<thread> threadpool;
     // Verify all geometries
     if(!test) for(size_t i=0;i<geometries.size();i++){
-        while(currentThreadCount>=maxThreads)sleep(0.1);
+        while(currentThreadCount>=maxThreads)usleep(100000);
         threadpool.push_back(thread(testGeometry,std::ref(geometries[i]),path));
         currentThreadCount++;
     } else for(size_t i=0;i<geometries.size();i++) cout << (path+"/checkGeometry "+geometries[i]) << endl;
@@ -854,12 +854,13 @@ Geomega settings:
     - `contents` - Contents of the line. Array of values(including strings) in the standard format, to be separated by spaces in the file.
 
 ### Dependencies:
-- MEGAlib (Tested on v2.34)
-- YAML-cpp (0.5 or newer)
-- g++ (Tested on 5.4.1, 7.3.0, and 8.1.1)
-- sendmail (optional, required only for email functionality)
-- curl (optional, required only for slack functionality)
-- backward-cpp and libdw-dev (optional, required only for debug functionality)
+ - MEGAlib (Tested on v2.34)
+ - yaml-cpp (0.5 or newer)
+ - g++ (Tested on 5.4.1, 7.3.0, and 8.1.1)
+    - clang++ may replace g++, but may require modifications to the Makefile (tested on clang++ 6.0.1)
+ - sendmail (optional, required only for email functionality)
+ - curl (optional, required only for slack functionality)
+ - backward-cpp and libdw-dev (optional, required only for debug functionality. backward-cpp is automatically fetched during `make debug`)
 
 ### To compile:
 
@@ -957,7 +958,7 @@ int main(int argc,char** argv){
 
     // Start all simulation threads.
     for(size_t i=0;i<sources.size();i++){
-        while(currentThreadCount>=maxThreads)sleep(0.1);
+        while(currentThreadCount>=maxThreads)usleep(100000);
         threadpool.push_back(thread(runSimulation,sources[i],threadpool.size()));
         currentThreadCount++;
     }

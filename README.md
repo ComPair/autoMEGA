@@ -21,11 +21,12 @@ The library is currently in a early release state. Bug reports and feature reque
 
 ### Dependencies:
 - MEGAlib (Tested on v2.34)
-- YAML-cpp (0.5 or newer)
+- yaml-cpp (0.5 or newer)
 - g++ (Tested on 5.4.1, 7.3.0, and 8.1.1)
+   - clang++ may replace g++, but may require modifications to the Makefile (tested on clang++ 6.0.1)
 - sendmail (optional, required only for email functionality)
 - curl (optional, required only for slack functionality)
-- backward-cpp and libdw-dev (optional, required only for debug functionality)
+- backward-cpp and libdw-dev (optional, required only for debug functionality. backward-cpp is automatically fetched during `make debug`)
 
 ### To compile:
 
@@ -35,10 +36,8 @@ make
 
 Or, manually:
 ```
-git submodule update --init --recursive --remote
-# Follow instructions to precompile pipeliningTools
-g++ checkGeometry.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -o checkGeometry $(root-config --cflags --glibs) -I$MEGALIB/include -L$MEGALIB/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc
-g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -o autoMEGA
+g++ checkGeometry.cpp -o checkGeometry -std=c++11 -pthread -lyaml-cpp -O2 -Wall $(root-config --cflags --glibs) -I$MEGALIB/include -L$MEGALIB/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc
+g++ autoMEGA.cpp -o autoMEGA -std=c++11 -pthread -lyaml-cpp -O2 -Wall
 ```
 
 Go to [Gitlab pages](https://cbray.gitlab.io/autoMEGA/autoMEGA_8cpp.html) for full documentation.
