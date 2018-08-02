@@ -672,11 +672,25 @@ int main(int argc,char** argv){
 
     if(slackVerbosity>=3) quickSlack("Starting Geomega stage.");
     vector<string> geometries;
-    if(config["geomega"]) if(geomegaSetup(config["geomega"],geometries)!=0) return 2;
+    if(config["geomega"]) if(geomegaSetup(config["geomega"],geometries)!=0){
+        exitFlag=1;
+        watchdog0.join();
+        statusThread.join();
+        for(size_t i=0;i<threadpool.size();i++) threadpool[i].join();
+        legend.close();
+        return 2;
+    }
 
     if(slackVerbosity>=3) quickSlack("Starting Cosima parsing stage");
     vector<string> sources;
-    if(config["cosima"]) if(cosimaSetup(config["cosima"],sources,geometries)!=0) return 3;
+    if(config["cosima"]) if(cosimaSetup(config["cosima"],sources,geometries)!=0){
+        exitFlag=1;
+        watchdog0.join();
+        statusThread.join();
+        for(size_t i=0;i<threadpool.size();i++) threadpool[i].join();
+        legend.close();
+        return 3;
+    }
 
     // Calculate total number of simulations
     if(slackVerbosity>=3) quickSlack("Starting all simulations");
