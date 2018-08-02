@@ -850,8 +850,8 @@ Geomega settings:
  - `filename` - Base geomega .geo.setup file
  - `parameters` - Array of parameters, formatted as such:
     - `filename` - Filename of the file to modify
-    - `line number` - line number of the file to modify
-    - `contents` - Contents of the line. Array of values(including strings) in the standard format, to be separated by spaces in the file.
+    - `line number` - line to replace
+    - `contents` - New contents of the line. Array of values in the standard format, to be separated by spaces in the file.
 
 ### Dependencies:
  - MEGAlib (Tested on v2.34)
