@@ -854,8 +854,8 @@ Geomega settings:
     - `contents` - Contents of the line. Array of values(including strings) in the standard format, to be separated by spaces in the file.
 
 ### Dependencies:
-- MEGAlib
-- YAML-cpp
+- MEGAlib (Tested on v2.34)
+- YAML-cpp (0.5 or newer)
 - g++ (Tested on 5.4.1, 7.3.0, and 8.1.1)
 - sendmail (optional, required only for email functionality)
 - curl (optional, required only for slack functionality)
@@ -869,10 +869,8 @@ make
 
 Or, manually:
 ```
-git submodule update --init --recursive --remote
-# Follow instructions to precompile pipeliningTools
-g++ checkGeometry.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -o checkGeometry $(root-config --cflags --glibs) -I$MEGALIB/include -L$MEGALIB/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc
-g++ autoMEGA.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -o autoMEGA
+g++ checkGeometry.cpp -o checkGeometry -std=c++11 -pthread -lyaml-cpp -O2 -Wall $(root-config --cflags --glibs) -I$MEGALIB/include -L$MEGALIB/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc
+g++ autoMEGA.cpp -o autoMEGA -std=c++11 -pthread -lyaml-cpp -O2 -Wall
 ```
 
 */
