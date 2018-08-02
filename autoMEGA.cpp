@@ -220,9 +220,26 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
     vector<vector<string>> options;
     if(geomega["parameters"].size()!=0){
         for(YAML::const_iterator it=geomega["parameters"].begin();it != geomega["parameters"].end();++it){
+            auto location = std::find(files.begin(), files.end(), it->second["filename"].as<string>());
+            if(location != files.end() && lines[location-files.begin()]==it->second["lineNumber"].as<int>()){
+                cerr << "GEOMEGA SETUP: Multiple parameters alter the same line in the file. Exiting." << endl;
+                quickSlack("GEOMEGA SETUP: Multiple parameters alter the same line in the file. Exiting.");
+                return 4;
+            }
+
             files.push_back(it->second["filename"].as<string>());
             lines.push_back(it->second["lineNumber"].as<int>());
             options.push_back(parseIterativeNode(it->second["contents"]));
+        }
+
+        for(size_t i=0;i<options.size();i++){
+            for(size_t j=0;j<options[i].size();j++){
+                if(options[i][j].find('\n') != std::string::npos){
+                    cerr << "GEOMEGA SETUP: One or more parameters include newlines. This creates undefined behavior. Exiting." << endl;
+                    quickSlack("GEOMEGA SETUP: One or more parameters include newlines. This creates undefined behavior. Exiting.");
+                    return 5;
+                }
+            }
         }
 
         legendLock.lock();
