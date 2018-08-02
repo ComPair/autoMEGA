@@ -5,12 +5,25 @@
     @author Connor Bray
 */
 
-#include "pipeliningTools/pipeline.h"
 #include "yaml-cpp/yaml.h"
+
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <atomic>
+#include <mutex>
+#include <string>
+#include <vector>
 #include <regex>
+#include <thread>
+#include <ctime>
+#include <chrono>
+#include <unistd.h>
+#include <sys/stat.h>
 #include <libgen.h>
 #include <termios.h>
-#include <unistd.h>
+#include <sys/statvfs.h>
+#include <glob.h>
 
 using namespace std;
 
@@ -48,6 +61,238 @@ atomic<int> statusBar[9];
 chrono::seconds averageTime(0);
 /// semaphore for average time
 mutex timeLock;
+/// Bool to tell external threads to exit
+std::atomic<bool> exitFlag;
+
+
+/**
+ @brief Generates a random seed from /dev/random or /dev/urandom
+
+ ## Generate a random seed from /dev/random or /dev/urandom
+
+ Generating the seed from /dev/random (or even /dev/urandom) is prefered to generating the seed from the current time because it allows you to start more than one simulation in a second and because /dev/random and /dev/urandom are more random than the current time, and /dev/random is cryptographically secure.
+
+ ### Arguments
+ * `bool uRandom` - Use /dev/urandom instead of /dev/random. Defaults to /dev/random
+
+ Code adapted from that posted by `posop` on stackoverflow
+*/
+template<typename T>
+T random_seed(bool uRandom=0){
+    T seed;
+    std::ifstream file(uRandom?"/dev/urandom":"/dev/random",std::ios::binary);
+    if(file.is_open()){
+        char *memblock;
+        T size=sizeof(T);
+        memblock=new char [size];
+        file.read(memblock,size);
+        file.close();
+        seed=*reinterpret_cast<T*>(memblock);
+        delete[] memblock;
+        return seed;
+    }else{return random_seed<T>();} // Continually retry until /dev/random is free
+}
+
+/**
+ @brief Removes a file, after expanding wildcards
+
+ ## Removes a file, after expanding wildcards
+
+ ### Arguments
+ - `string file` - File to remove, may include
+
+ ### Notes:
+ Uses POSIX remove and glob
+
+*/
+void removeWildcard(std::string file){
+    glob_t glob_result;
+    glob(file.c_str(),GLOB_TILDE,NULL,&glob_result);
+    for(unsigned int i=0;i<glob_result.gl_pathc;++i){
+        remove(glob_result.gl_pathv[i]);
+    }
+    globfree(&glob_result);
+}
+
+/**
+@brief Check if directory is empty
+
+  ## Check run directory for files
+
+  ### Arguments:
+  * `string dir` - Directory to check if running in.
+
+  ### Notes:
+  If it is, it returns zero, otherwise it prompts the user for how they want to procede. Returns 0 if they want to procede and 1 otherwise.
+*/
+bool directoryEmpty(std::string dir){
+    int i, ret=system(("DIR='"+dir+"';[ \"$(ls -A $DIR)\" ] && exit 1 || exit 0").c_str());
+    i=WEXITSTATUS(ret); // Get return value.
+    if(i==0) return 0;
+    while(1){
+        std::cout << "Directory not empty. Press c then enter to clean, press s then enter to skip, or press e then enter to exit." << std::endl;
+        std::string input;
+        std::cin >> input;
+        if(input[0]=='c'||input[0]=='C'){
+            std::cout << "Cleaning directory." << std::endl;
+            removeWildcard(dir+"/*");
+            return 0;
+        }
+        if(input[0]=='s'||input[0]=='S'){
+            std::cout << "Skipping clean directory." << std::endl;
+            return 0;
+        }
+        if(input[0]=='e'||input[0]=='E'){
+            std::cout << "Exiting." << std::endl;
+            return 1;
+        }
+        std::cout << "Error. ";
+    }
+}
+
+/**
+@brief Storage watchdog program (threadable)
+
+ ## Watches the amount of available storage, and kills the program if <n MB is remaining (configurable).
+
+ ### Arguments:
+ * `double MB` - Remaining storage (in MB) to abort if reached.
+
+ ### Notes:
+ Sleeps 1 second between tests.
+**/
+void storageWatchdog(double MB){
+    struct statvfs buf;
+    char pwd[1024];
+    getcwd(pwd, sizeof(pwd));
+
+    while(!exitFlag){
+        statvfs(pwd, &buf);
+        if((buf.f_frsize * buf.f_bavail / 1000000) < MB) abort();
+        sleep(1);
+    }
+}
+
+/**
+ @brief Returns a human-readable string of a duration.
+
+    ## Returns a human-readable string of a duration. Credit to TankorSmash on Stackoverflow for the code provided freely in answer to a question asked by sorush-r
+
+    ### Arguments:
+    * `std::chrono::seconds input_seconds` - Duration to convert to human readable string.
+
+    ### Returns:
+    * `std::string` - Human readable time duration.
+*/
+std::string beautify_duration(std::chrono::seconds input_seconds)
+{
+    using namespace std::chrono;
+    typedef duration<int, std::ratio<86400>> days;
+    auto d = duration_cast<days>(input_seconds);
+    input_seconds -= d;
+    auto h = duration_cast<hours>(input_seconds);
+    input_seconds -= h;
+    auto m = duration_cast<minutes>(input_seconds);
+    input_seconds -= m;
+    auto s = duration_cast<seconds>(input_seconds);
+
+    auto dc = d.count();
+    auto hc = h.count();
+    auto mc = m.count();
+    auto sc = s.count();
+
+    std::stringstream ss;
+    ss.fill('0');
+    if (dc) {
+        ss << d.count() << "d";
+    }
+    if (dc || hc) {
+        if (dc) { ss << std::setw(2); } //pad if second set of numbers
+        ss << h.count() << "h";
+    }
+    if (dc || hc || mc) {
+        if (dc || hc) { ss << std::setw(2); }
+        ss << m.count() << "m";
+    }
+    if (dc || hc || mc || sc) {
+        if (dc || hc || mc) { ss << std::setw(2); }
+        ss << s.count() << 's';
+    }
+
+    return ss.str();
+}
+
+/**
+
+ @brief Check if file exists
+
+ ## Check if file exists. Code originally from PherricOxide on stackoverflow, modified slightly
+
+*/
+inline bool fileExists(const std::string& name){
+  struct stat buffer;
+  return (stat (name.c_str(), &buffer) == 0);
+}
+
+/**
+ @brief Post message as slack bot, rather than with webhook
+
+ ## Sends slack message
+
+ ### Arguments:
+ * `string token` - Bot oath2 token to use
+ * `string channel` - Channel to post to (Bot must have access to this channel)
+ * `string message` - Message to post
+
+ ### Notes:
+ Will return the timestamp of the message in case you want to update it later
+
+ To use, you will need to go to api.slack.com, and get an bot token for whichever DM or channel you want to message.
+*/
+std::string slackBotPost(std::string token,std::string channel,std::string message){
+    system(("curl -X POST -H 'Authorization: Bearer "+token+"' -H 'Content-type: application/json' --data '{\"channel\":\""+channel+"\",\"text\":\""+message+"\"}' https://slack.com/api/chat.postMessage -s | grep -e \"\\\"ts\\\":\\\"[0-9.]*\\\"\" -o | grep \"[0-9.]*\" -o > slack.bot.timestamp.log.tmp").c_str());
+    std::ifstream ts("slack.bot.timestamp.log.tmp");
+    std::string timestamp; ts >> timestamp;
+    system("rm slack.bot.timestamp.log.tmp");
+    return timestamp;
+}
+
+/**
+ @brief Update message posted as slack bot
+
+ ## Updates slack message
+
+ ### Arguments:
+ * `string token` - Bot oath2 token to use
+ * `string channel` - Channel to post to (Bot must have access to this channel)
+ * `string ts` - Timestamp of post to update
+ * `string message` - New message
+
+ ### Notes:
+ To use, you will need to go to api.slack.com, and get an bot token for whichever DM or channel you want to message.
+*/
+void slackBotUpdate(std::string token,std::string channel,std::string ts,std::string message){
+    system(("curl -X POST -H 'Authorization: Bearer "+token+"' -H 'Content-type: application/json' --data '{\"channel\":\""+channel+"\",\"ts\":\""+ts+"\",\"text\":\""+message+"\"}' https://slack.com/api/chat.update -s -o /dev/null").c_str());
+}
+
+/**
+@brief Emails user
+
+ ## Email user
+
+ ### Arguments:
+ * `string destination` - Email to send to
+ * `string message` - Message of Email
+
+ ### Notes:
+ To email when program is complete, in your main, add the following line: `std::atexit(email(destination,message));`
+
+ Also, please use this sparingly. If any major email providers decide that it is spam, then its going to be broken for everyone on cronos forever.
+*/
+void email(std::string destination, std::string message){
+    system(("echo "+message+" | sendmail -F JARVIS "+destination).c_str());
+    return;
+}
 
 /**
  @brief Print simulation status bar
@@ -605,7 +850,8 @@ Geomega settings:
 ### Dependencies:
 - MEGAlib
 - YAML-cpp
-- pipeliningTools
+- sendmail (optional, required only for email functionality)
+- curl (optional, required only for slack functionality)
 
 ### To compile:
 
@@ -678,6 +924,10 @@ int main(int argc,char** argv){
         statusThread.join();
         for(size_t i=0;i<threadpool.size();i++) threadpool[i].join();
         legend.close();
+        // Enable echo
+        tcgetattr(STDIN_FILENO, &tty);
+        tty.c_lflag |= ECHO;
+        (void) tcsetattr(STDIN_FILENO, TCSANOW, &tty);
         return 2;
     }
 
@@ -689,6 +939,10 @@ int main(int argc,char** argv){
         statusThread.join();
         for(size_t i=0;i<threadpool.size();i++) threadpool[i].join();
         legend.close();
+        // Enable echo
+        tcgetattr(STDIN_FILENO, &tty);
+        tty.c_lflag |= ECHO;
+        (void) tcsetattr(STDIN_FILENO, TCSANOW, &tty);
         return 3;
     }
 

@@ -1,4 +1,20 @@
-#include "pipeliningTools/pipeline.h"
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <atomic>
+#include <mutex>
+#include <string>
+#include <vector>
+#include <regex>
+#include <thread>
+#include <ctime>
+#include <chrono>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <libgen.h>
+#include <termios.h>
+#include <sys/statvfs.h>
+#include <glob.h>
 
 using namespace std;
 #include <TROOT.h>
@@ -7,6 +23,24 @@ using namespace std;
 #include <MString.h>
 #include <TSystem.h>
 #include "MInterfaceGeomega.h"
+
+
+/**
+
+ @brief Gets file of given file
+
+ ## Get file size of given file. Credit to Matt on StackOverflow.
+
+ ### Arguments
+ - `std::string filename` - Filename to get size of
+
+*/
+long getFileSize(std::string filename){
+    struct stat stat_buf;
+    int rc = stat(filename.c_str(), &stat_buf);
+    return rc == 0 ? stat_buf.st_size : -1;
+}
+
 
 /**
  @brief Interface to geomega to run geometry checks
