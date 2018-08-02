@@ -18,8 +18,7 @@ autoMEGA:
 		$(CC) autoMEGA.cpp -o autoMEGA $(MAIN_FLAGS)
 
 debug-autoMEGA:
-		git submodule add https://github.com/bombela/backward-cpp
-		git submodule update --init --remote --recursive
+		git clone https://github.com/bombela/backward-cpp
 		$(CC) autoMEGA.cpp -o autoMEGA $(MAIN_FLAGS) -D DEBUG
 
 clean:
