@@ -1,9 +1,9 @@
-image: gcc
+image: ubuntu
 
 build:
   stage: build
   before_script:
-    - apt update && apt -y install make libboost-dev libyaml-cpp-dev
+    - apt update && apt -y install gcc make libboost-dev libyaml-cpp-dev
   script:
     - make noMEGAlib
 

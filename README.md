@@ -22,7 +22,8 @@ The library is currently in a early release state. Bug reports and feature reque
 ### Dependencies:
 - MEGAlib (Tested on v2.34)
 - YAML-cpp
-- [pipeliningTools](https://gitlab.com/cbray/pipeliningTools)
+- sendmail (optional, required only for email functionality)
+- curl (optional, required only for slack functionality)
 
 ### To compile:
 
