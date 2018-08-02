@@ -7,6 +7,13 @@ build:
   script:
     - make noMEGAlib
 
+debug-build:
+  stage: build
+  before_script:
+    - apt update && apt -y install g++ make libboost-dev libyaml-cpp-dev libdw-dev
+  script:
+    - make debug-noMEGAlib
+
 pages:
   only:
     refs:

@@ -27,6 +27,12 @@
 
 using namespace std;
 
+#ifdef DEBUG // Optionally include backward-cpp backtrace
+#define BACKWARD_HAS_DW 1
+#include "backward-cpp/backward.hpp"
+namespace backward {backward::SignalHandling sh;}
+#endif
+
 // Default values for all arguments. Strings cannot be atomic, but they should only be read by threads, so there shouldnt be a problem.
 
 /// Yaml config file for the simulation
@@ -852,6 +858,7 @@ Geomega settings:
 - YAML-cpp
 - sendmail (optional, required only for email functionality)
 - curl (optional, required only for slack functionality)
+- backward-cpp and libdw-dev (optional, required only for debug functionality)
 
 ### To compile:
 

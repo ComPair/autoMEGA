@@ -24,6 +24,7 @@ The library is currently in a early release state. Bug reports and feature reque
 - YAML-cpp
 - sendmail (optional, required only for email functionality)
 - curl (optional, required only for slack functionality)
+- backward-cpp and libdw-dev (optional, required only for debug functionality)
 
 ### To compile:
 
