@@ -572,7 +572,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
 
                     // Copy rest of stream and swap streams
                     while(getline(alteredGeometry,line)) newGeometry << line << "\n";
-                    alteredGeometry.str(newGeometry.str());
+                    alteredGeometry.swap(newGeometry);
                 }
 
                 // Create new file
@@ -856,6 +856,7 @@ Geomega settings:
 ### Dependencies:
 - MEGAlib
 - YAML-cpp
+- g++ (Tested on 5.4.1, 7.3.0, and 8.1.1)
 - sendmail (optional, required only for email functionality)
 - curl (optional, required only for slack functionality)
 - backward-cpp and libdw-dev (optional, required only for debug functionality)
