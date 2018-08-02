@@ -3,7 +3,7 @@ image: ubuntu
 build:
   stage: build
   before_script:
-    - apt update && apt -y install gcc make libboost-dev libyaml-cpp-dev
+    - apt update && apt -y install g++ make libboost-dev libyaml-cpp-dev
   script:
     - make noMEGAlib
 
@@ -13,7 +13,7 @@ pages:
       - master
   stage: deploy
   script:
-    - apt update && apt -y install make doxygen doxygen-doc doxygen-latex doxygen-gui libboost-dev libyaml-cpp-dev
+    - apt update && apt -y install make g++ doxygen doxygen-doc doxygen-latex doxygen-gui libboost-dev libyaml-cpp-dev
     - git submodule update --init --recursive --remote
     - doxygen Doxyfile
   artifacts:
