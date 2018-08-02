@@ -856,7 +856,7 @@ Geomega settings:
 ### Dependencies:
  - MEGAlib (Tested on v2.34)
  - yaml-cpp (0.5 or newer)
- - g++ (Tested on 5.4.1, 7.3.0, and 8.1.1)
+ - g++ with C++11 (Tested on 5.4.1, 7.3.0, and 8.1.1)
     - clang++ may replace g++, but may require modifications to the Makefile (tested on clang++ 6.0.1)
  - sendmail (optional, required only for email functionality)
  - curl (optional, required only for slack functionality)
