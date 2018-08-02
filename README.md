@@ -22,6 +22,7 @@ The library is currently in a early release state. Bug reports and feature reque
 ### Dependencies:
 - MEGAlib (Tested on v2.34)
 - YAML-cpp
+- g++ (Tested on 5.4.1, 7.3.0, and 8.1.1)
 - sendmail (optional, required only for email functionality)
 - curl (optional, required only for slack functionality)
 - backward-cpp and libdw-dev (optional, required only for debug functionality)

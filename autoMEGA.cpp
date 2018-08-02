@@ -572,7 +572,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
 
                     // Copy rest of stream and swap streams
                     while(getline(alteredGeometry,line)) newGeometry << line << "\n";
-                    alteredGeometry.swap(newGeometry);
+                    alteredGeometry.str(newGeometry.str());
                 }
 
                 // Create new file

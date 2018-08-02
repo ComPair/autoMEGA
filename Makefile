@@ -19,7 +19,7 @@ autoMEGA:
 
 debug-autoMEGA:
 		git clone https://github.com/bombela/backward-cpp
-		$(CC) autoMEGA.cpp -o autoMEGA $(MAIN_FLAGS) -g -D DEBUG
+		$(CC) autoMEGA.cpp -o autoMEGA $(MAIN_FLAGS) -g -ldw -D DEBUG
 
 clean:
 		rm -f autoMEGA checkGeometry
