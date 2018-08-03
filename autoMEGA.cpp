@@ -99,6 +99,7 @@ T random_seed(bool uRandom=0){
     }else{return random_seed<T>();} // Continually retry until /dev/random is free
 }
 
+
 /**
  @brief Removes a file, after expanding wildcards
 
@@ -114,11 +115,10 @@ T random_seed(bool uRandom=0){
 void removeWildcard(std::string file){
     glob_t glob_result;
     glob(file.c_str(),GLOB_TILDE,NULL,&glob_result);
-    for(unsigned int i=0;i<glob_result.gl_pathc;++i){
-        remove(glob_result.gl_pathv[i]);
-    }
+    for(unsigned int i=0;i<glob_result.gl_pathc;++i) remove(glob_result.gl_pathv[i]);
     globfree(&glob_result);
 }
+
 
 /**
 @brief Check if directory is empty
@@ -156,6 +156,7 @@ bool directoryEmpty(std::string dir){
     }
 }
 
+
 /**
 @brief Storage watchdog program (threadable)
 
@@ -178,6 +179,7 @@ void storageWatchdog(double MB){
         sleep(1);
     }
 }
+
 
 /**
  @brief Returns a human-readable string of a duration.
@@ -228,6 +230,7 @@ std::string beautify_duration(std::chrono::seconds input_seconds)
     return ss.str();
 }
 
+
 /**
 
  @brief Check if file exists
@@ -239,6 +242,7 @@ inline bool fileExists(const std::string& name){
   struct stat buffer;
   return (stat (name.c_str(), &buffer) == 0);
 }
+
 
 /**
  @brief Post message as slack bot, rather than with webhook
@@ -263,6 +267,7 @@ std::string slackBotPost(std::string token,std::string channel,std::string messa
     return timestamp;
 }
 
+
 /**
  @brief Update message posted as slack bot
 
@@ -280,6 +285,7 @@ std::string slackBotPost(std::string token,std::string channel,std::string messa
 void slackBotUpdate(std::string token,std::string channel,std::string ts,std::string message){
     system(("curl -X POST -H 'Authorization: Bearer "+token+"' -H 'Content-type: application/json' --data '{\"channel\":\""+channel+"\",\"ts\":\""+ts+"\",\"text\":\""+message+"\"}' https://slack.com/api/chat.update -s -o /dev/null").c_str());
 }
+
 
 /**
 @brief Emails user
@@ -299,6 +305,7 @@ void email(std::string destination, std::string message){
     system(("echo "+message+" | sendmail -F JARVIS "+destination).c_str());
     return;
 }
+
 
 /**
  @brief Print simulation status bar
@@ -325,12 +332,19 @@ void handleStatus(){
     }
 }
 
+
 /**
  @brief Quick alias for slack notifications
+
+ ## Alias for slack notifications
+
+ ### Notes:
+ Only prints slack message if it has a valid token and channel
 */
 void quickSlack(string message){
     if(!token.empty() && !channel.empty()) slackBotPost(token,channel,message);
 }
+
 
 /**
  @brief Parse iterative nodes in list or pattern mode
@@ -429,6 +443,7 @@ int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
     if(recursionDepth==0) out << "///End " << inputFile << "\n"; // Note final file
     return 0;
 }
+
 
 /**
 
@@ -612,6 +627,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
         legendLock.unlock();
     } else geometries.push_back("g.geo.setup");
 
+    // Get current path
     char result[ 1024 ];
     ssize_t count = readlink("/proc/self/exe", result, 1024);
     string path = (count != -1)?dirname(result):".";
@@ -634,6 +650,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
     return 0;
 }
 
+
 /**
  @brief Parse cosima settings and setup source files
 
@@ -654,8 +671,8 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
     // Update status
     statusBar[3]=statusBar[6]=1;
 
-    string baseFileName = cosima["filename"].as<string>();
     // Make sure config file exists
+    string baseFileName = cosima["filename"].as<string>();
     if(!fileExists(baseFileName)){
         cerr << "File \"" << baseFileName << "\" does not exist, but was requested. Exiting."<< endl;
         if(slackVerbosity>=1) quickSlack("COSIMA SETUP: File \"" + baseFileName + "\" does not exist, but was requested. Exiting.");
@@ -749,9 +766,9 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
 
     // Update status
     statusBar[5]=statusBar[8]=alteredSources.size();
-
     return 0;
 }
+
 
 /**
  @brief Runs the Cosima simulation and Revan data reduction for one set of parameters
@@ -767,10 +784,9 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
 
 */
 void runSimulation(const string source, const int threadNumber){
-    auto start = chrono::steady_clock::now();
-
-    // Get seed
+    // Setup
     uint32_t seed = random_seed<uint32_t>(1);
+    auto start = chrono::steady_clock::now();
 
     // Create legend
     legendLock.lock();
@@ -787,9 +803,9 @@ void runSimulation(const string source, const int threadNumber){
     sourceFile>>geoSetup;
     sourceFile.close();
 
-    // Actually run simulation and analysis
-    // Remove intermediary files when they are no longer necessary (unless keepAll is set)
+    // Actually run simulation and analysis, and remove intermediary files when they are no longer necessary (unless keepAll is set)
     if(!test){
+        // Cosima stage
         int status, ret=system(("bash -c \"source ${MEGALIB}/bin/source-megalib.sh; cosima -v "+to_string(cosimaVerbosity)+" -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz; exit $?\"").c_str());
         status=WEXITSTATUS(ret); // Get return value
         if(status){
@@ -797,6 +813,8 @@ void runSimulation(const string source, const int threadNumber){
             return;
         }
         statusBar[4]++;
+
+        // Revan stage
         ret=system(("bash -c \"source ${MEGALIB}/bin/source-megalib.sh; revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".*.sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz; exit $?\"").c_str());
         status=WEXITSTATUS(ret); // Get return value
         if(status){
@@ -804,8 +822,11 @@ void runSimulation(const string source, const int threadNumber){
             return;
         }
         statusBar[7]++;
+
+        // Cleanup
         if(!keepAll) removeWildcard("run"+to_string(threadNumber)+".*.sim.gz");
     }else{
+        // Dry run
         cout << "bash -c \"source ${MEGALIB}/bin/source-megalib.sh; cosima -v "+to_string(cosimaVerbosity)+" -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz; exit $?\"\n";
         cout << "bash -c \"source ${MEGALIB}/bin/source-megalib.sh; revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".*.sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz; exit $?\"\n";
         if(!keepAll) cout << "rm run"+to_string(threadNumber)+".*.sim.gz\n";
@@ -817,10 +838,12 @@ void runSimulation(const string source, const int threadNumber){
     timeLock.lock();
     averageTime = (averageTime.count()!=0)?(averageTime*10+thisTime)/(11):thisTime;
     timeLock.unlock();
+
     // Cleanup and exit
     currentThreadCount--;
     return;
 }
+
 
 /**
 ## autoMEGA
@@ -881,11 +904,9 @@ Geomega settings:
  - backward-cpp and libdw-dev (optional, required only for debug functionality. backward-cpp is automatically fetched during `make debug`)
 
 ### To compile:
-
 ```
 make
 ```
-
 Or, manually:
 ```
 g++ checkGeometry.cpp -o checkGeometry -std=c++11 -pthread -lyaml-cpp -O2 -Wall $(root-config --cflags --glibs) -I$MEGALIB/include -L$MEGALIB/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc
@@ -941,6 +962,7 @@ int main(int argc,char** argv){
     // Start status thread
     thread statusThread(handleStatus);
 
+    // Geomega stage
     if(slackVerbosity>=3) quickSlack("Starting Geomega stage.");
     vector<string> geometries;
     if(config["geomega"]) if(geomegaSetup(config["geomega"],geometries)!=0){
@@ -956,6 +978,7 @@ int main(int argc,char** argv){
         return 2;
     }
 
+    // Cosima stage
     if(slackVerbosity>=3) quickSlack("Starting Cosima parsing stage");
     vector<string> sources;
     if(config["cosima"]) if(cosimaSetup(config["cosima"],sources,geometries)!=0){
@@ -976,7 +999,7 @@ int main(int argc,char** argv){
 
     // Start all simulation threads.
     for(size_t i=0;i<sources.size();i++){
-        while(currentThreadCount>=maxThreads)usleep(100000);
+        while(currentThreadCount>=maxThreads) usleep(100000);
         threadpool.push_back(thread(runSimulation,sources[i],threadpool.size()));
         currentThreadCount++;
     }
