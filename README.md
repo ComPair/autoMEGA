@@ -1,4 +1,6 @@
-# autoMEGA
+# autoMEGA - Release Mirror
+
+> This is the latest release of autoMEGA. To submit feature requests, bug reports, or to view the development tree, go to [gitlab.com/cbray/autoMEGA](https://gitlab.com/cbray/autoMEGA)
 
 Tool for automating MEGAlib simulations. The goal is to create a user-friendly method for running iterative simulations.
 
