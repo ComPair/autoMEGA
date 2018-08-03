@@ -42,3 +42,4 @@ test/
 *.tmp
 logo*
 backward-cpp/
+test.cpp

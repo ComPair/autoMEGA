@@ -351,11 +351,18 @@ vector<string> parseIterativeNode(YAML::Node contents, std::string prepend=""){
     for(size_t i=0;i<contents.size();i++){
         // Parse options into vector of strings
         vector<string> parameters;
-        if(contents[i].size()==3){
+        if(contents[i].size()==3 && contents[i][0].size()==0 && contents[i][1].size()==0 && contents[i][2].size()==0){
             double final = contents[i][1].as<double>();
             double step = contents[i][2].as<double>();
             for(double initial = contents[i][0].as<double>();initial<final;initial+=step) parameters.push_back(to_string(initial));
-        } else for(size_t j=0;j<contents[i][0].size();j++) parameters.push_back(contents[i][0][j].as<string>());
+        } else if(contents[i].size()==1){
+            if(contents[i][0].size()==0) parameters.push_back("");
+            for(size_t j=0;j<contents[i][0].size();j++) parameters.push_back(contents[i][0][j].as<string>());
+        } else{
+            quickSlack("PARSEITERATIVENODE: Malformed iterative node. Please see manual on correct format for iterative nodes. Exiting.");
+            exitFlag=1;
+            vector<string> empty; return empty;
+        }
         for(size_t j=0;j<options.size();j++){
             for(size_t k=0;k<parameters.size();k++)
                 newOptions.push_back(options[j]+" "+parameters[k]);
@@ -481,6 +488,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
             files.push_back(it->second["filename"].as<string>());
             lines.push_back(it->second["lineNumber"].as<int>());
             options.push_back(parseIterativeNode(it->second["contents"]));
+            if(exitFlag) return 6;
         }
 
         for(size_t i=0;i<options.size();i++){
@@ -653,6 +661,7 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
         if(it->second["flux"]) options[it->second["source"].as<string>()+".Flux"] = parseIterativeNode(it->second["flux"],it->second["source"].as<string>()+".Flux");
         if(it->second["polarization"]) options[it->second["source"].as<string>()+".Polarization"] = parseIterativeNode(it->second["polarization"],it->second["source"].as<string>()+".Polarization");
         if(it->second["particleType"]) options[it->second["source"].as<string>()+".ParticleType"] = parseIterativeNode(it->second["particleType"],it->second["source"].as<string>()+".ParticleType");
+        if(exitFlag) return 6;
     }
     string timing[2] = {"",""};
     if(cosima["events"]){
