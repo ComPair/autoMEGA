@@ -369,7 +369,7 @@ vector<string> parseIterativeNode(YAML::Node contents, std::string prepend=""){
         // Parse options into vector of strings
         vector<string> parameters;
         if(contents[i].size()==3 && contents[i][0].size()==0 && contents[i][1].size()==0 && contents[i][2].size()==0){
-            double initial = contents[i][0].as<double>()
+            double initial = contents[i][0].as<double>();
             double final = contents[i][1].as<double>();
             double step = contents[i][2].as<double>();
             if((final-initial)*step < 0) quickSlack("Warning: PARSEITERATIVENODE: Step size of opposite sign to difference between final and initial values.",1);
