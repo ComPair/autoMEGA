@@ -18,6 +18,7 @@
 #include <thread>
 #include <ctime>
 #include <chrono>
+#include <algorithm>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <libgen.h>
@@ -341,8 +342,9 @@ void handleStatus(){
  ### Notes:
  Only prints slack message if it has a valid token and channel
 */
-void quickSlack(string message){
-    if(!token.empty() && !channel.empty()) slackBotPost(token,channel,message);
+void quickSlack(string message,int verbosity=0){
+    if(!token.empty() && !channel.empty() && verbosity<=slackVerbosity) slackBotPost(token,channel,message);
+    cerr << message << endl;
 }
 
 
@@ -362,27 +364,34 @@ void quickSlack(string message){
 vector<string> parseIterativeNode(YAML::Node contents, std::string prepend=""){
     vector<string> options; options.push_back(prepend);
     vector<string> newOptions;
-    if(contents.size()==0){
-        if(slackVerbosity>=1) quickSlack("Warning: PARSEITERATIVENODE: Empty iterative node set.");
-        cerr << "Warning: PARSEITERATIVENODE: Empty iterative node set." << endl;
-    }
+    if(contents.size()==0) quickSlack("Warning: PARSEITERATIVENODE: Empty iterative node set.",1);
     for(size_t i=0;i<contents.size();i++){
         // Parse options into vector of strings
         vector<string> parameters;
         if(contents[i].size()==3 && contents[i][0].size()==0 && contents[i][1].size()==0 && contents[i][2].size()==0){
+            double initial = contents[i][0].as<double>()
             double final = contents[i][1].as<double>();
             double step = contents[i][2].as<double>();
-            for(double initial = contents[i][0].as<double>();initial<final;initial+=step) parameters.push_back(to_string(initial));
+            if((final-initial)*step < 0) quickSlack("Warning: PARSEITERATIVENODE: Step size of opposite sign to difference between final and initial values.",1);
+            for(int total=0;initial<final;initial+=step){
+                parameters.push_back(to_string(initial));
+                if(total++>100000){
+                    quickSlack("PARSEITERATIVENODE: More than 100000 options generated. This will likely cause RAM issues. This is likely due to a step size that is too small or of the wrong sign. Exiting.");
+                    exitFlag=1;
+                    vector<string> empty; return empty;
+                }
+            }
         } else if(contents[i].size()==1){
             if(contents[i][0].size()==0){
                 parameters.push_back("");
-                if(slackVerbosity>=1) quickSlack("Warning: PARSEITERATIVENODE: Empty iterative node.");
-                cerr << "Warning: PARSEITERATIVENODE: Empty iterative node." << endl;
+                quickSlack("Warning: PARSEITERATIVENODE: Empty iterative node.",1);
             }
-            for(size_t j=0;j<contents[i][0].size();j++) parameters.push_back(contents[i][0][j].as<string>());
+            for(size_t j=0;j<contents[i][0].size();j++){
+                if(std::find(parameters.begin(),parameters.end(),contents[i][0][j].as<string>())!=parameters.end()) quickSlack("Warning: PARSEITERATIVENODE: Duplicate value in literal iterator.",1);
+                parameters.push_back(contents[i][0][j].as<string>());
+            }
         } else{
             quickSlack("PARSEITERATIVENODE: Malformed iterative node. Please see manual on correct format for iterative nodes. Exiting.");
-            cerr << "PARSEITERATIVENODE: Malformed iterative node. Please see manual on correct format for iterative nodes. Exiting." << endl;
             exitFlag=1;
             vector<string> empty; return empty;
         }
@@ -408,8 +417,7 @@ vector<string> parseIterativeNode(YAML::Node contents, std::string prepend=""){
 */
 int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
     if(recursionDepth>1024){
-        cerr << "Exceeded max recursion depth of 1024. This is likely due to a circular dependency. If not, then your geometry is way to complex. Exiting." << endl;
-        if(slackVerbosity>=1) quickSlack("GEOMERGE: Exceeded max recursion depth of 1024. This is likely due to a circular dependency. If not, then your geometry is way to complex. Exiting.");
+        quickSlack("GEOMERGE: Exceeded max recursion depth of 1024. This is likely due to a circular dependency. If not, then your geometry is way to complex. Exiting.",1);
         return -1;
     }
     if(recursionDepth==0) out << "///Include " << inputFile << "\n"; // Note initial file
@@ -417,8 +425,7 @@ int geoMerge(string inputFile, ofstream& out, int recursionDepth=0){
     // Open file
     ifstream input(inputFile);
     if(!input.is_open() || !input.good()){
-        cerr << "Could not open included file \"" << inputFile << "\"." << endl;
-        if(slackVerbosity>=1) quickSlack("GEOMERGE: Could not open included file \"" + inputFile + "\".");
+        quickSlack("GEOMERGE: Could not open included file \"" + inputFile + "\".",1);
         return 1;
     }
 
@@ -462,8 +469,7 @@ void testGeometry(string& filename, string path){
     int status, ret=system((path+"/checkGeometry "+filename+" > /dev/null 2> /dev/null").c_str());
     status=WEXITSTATUS(ret); // Get return value
     if(status){
-        cerr << "GEOMEGA: Geometry error in geometry \""+filename+"\". Removing geometry from list." << endl;
-        if(slackVerbosity>=1) quickSlack("GEOMEGA: Geometry error in geometry \""+filename+"\". Removing geometry from list.");
+        quickSlack("GEOMEGA: Geometry error in geometry \""+filename+"\". Removing geometry from list.",1);
         filename="";
         statusBar[2]--;
     } else statusBar[1]++;
@@ -492,7 +498,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
 
     // Merge all files together
     ofstream baseGeometry("g.geo.setup");
-    if(!baseGeometry.is_open()){ cerr << "Could not create new base geometry file. Exiting" << endl; if(slackVerbosity>=1) quickSlack("GEOMEGA SETUP: Could not create new base geometry file. Exiting."); return 3;}
+    if(!baseGeometry.is_open()){quickSlack("GEOMEGA SETUP: Could not create new base geometry file. Exiting.",1); return 3;}
     if(geoMerge(geomega["filename"].as<string>(),baseGeometry)) return 1;
     baseGeometry.close();
 
@@ -504,7 +510,6 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
         for(YAML::const_iterator it=geomega["parameters"].begin();it != geomega["parameters"].end();++it){
             auto location = std::find(files.begin(), files.end(), it->second["filename"].as<string>());
             if(location != files.end() && lines[location-files.begin()]==it->second["lineNumber"].as<int>()){
-                cerr << "GEOMEGA SETUP: Multiple parameters alter the same line in the file. Exiting." << endl;
                 quickSlack("GEOMEGA SETUP: Multiple parameters alter the same line in the file. Exiting.");
                 return 4;
             }
@@ -518,7 +523,6 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
         for(size_t i=0;i<options.size();i++){
             for(size_t j=0;j<options[i].size();j++){
                 if(options[i][j].find('\n') != std::string::npos){
-                    cerr << "GEOMEGA SETUP: One or more parameters include newlines. This creates undefined behavior. Exiting." << endl;
                     quickSlack("GEOMEGA SETUP: One or more parameters include newlines. This creates undefined behavior. Exiting.");
                     return 5;
                 }
@@ -564,8 +568,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
 
                     // Make sure we found the file
                     if(!foundFile){
-                        cerr << "Attempted to alter line number past end of file. File: \""+files[i]+"\". Exiting." << endl;
-                        if(slackVerbosity>=1) quickSlack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i]);
+                        quickSlack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i],1);
                         return 5;
                     }
 
@@ -582,8 +585,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
                                 newGeometry << line << "\n";
                                 // Check we havent passed "///End "+files[i]
                                 if(line=="///End "+files[i]){
-                                    cerr << "Attempted to alter line number past end of file. File: \""+files[i]+"\". Exiting." << endl;
-                                    if(slackVerbosity>=1) quickSlack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i]);
+                                    quickSlack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i],1);
                                     return 4;
                                 }
                                 if(line=="///End "+file) break;
@@ -591,8 +593,7 @@ int geomegaSetup(YAML::Node geomega, vector<string> &geometries){
                         }
                         // Check we havent passed "///End "+files[i]
                         if(line=="///End "+files[i]){
-                            cerr << "Attempted to alter line number past end of file. File: \""+files[i]+"\". Exiting." << endl;
-                            if(slackVerbosity>=1) quickSlack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i]);
+                            quickSlack("GEOMEGA SETUP: Attempted to alter line number past end of file. File: "+files[i],1);
                             return 4;
                         }
                     }
@@ -674,8 +675,7 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
     // Make sure config file exists
     string baseFileName = cosima["filename"].as<string>();
     if(!fileExists(baseFileName)){
-        cerr << "File \"" << baseFileName << "\" does not exist, but was requested. Exiting."<< endl;
-        if(slackVerbosity>=1) quickSlack("COSIMA SETUP: File \"" + baseFileName + "\" does not exist, but was requested. Exiting.");
+        quickSlack("COSIMA SETUP: File \"" + baseFileName + "\" does not exist, but was requested. Exiting.",1);
         return 1;
     }
 
@@ -691,26 +691,26 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
     }
     string timing[2] = {"",""};
     if(cosima["events"]){
-        if(timing[0]=="") {timing[0]="Events"; timing[1]=cosima["events"].as<string>();}
-        else {
-            cerr << "COSIMA SETUP: Multiple timing definitions. Exiting." << endl;
-            if(slackVerbosity>=1) quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.");
+        if(timing[0]=="") {
+            timing[0]="Events"; timing[1]=cosima["events"].as<string>();
+        } else {
+            quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.",1);
             return 1;
         }
     }
     if(cosima["triggers"]){
-        if(timing[0]=="") {timing[0]="Triggers"; timing[1]=cosima["triggers"].as<string>();}
-        else {
-            cerr << "COSIMA SETUP: Multiple timing definitions. Exiting." << endl;
-            if(slackVerbosity>=1) quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.");
+        if(timing[0]=="") {
+            timing[0]="Triggers"; timing[1]=cosima["triggers"].as<string>();
+        } else {
+            quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.",1);
             return 1;
         }
     }
     if(cosima["time"]){
-        if(timing[0]=="") {timing[0]="Time"; timing[1]=cosima["time"].as<string>();}
-        else {
-            cerr << "COSIMA SETUP: Multiple timing definitions. Exiting." << endl;
-            if(slackVerbosity>=1) quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.");
+        if(timing[0]=="") {
+            timing[0]="Time"; timing[1]=cosima["time"].as<string>();
+        } else {
+            quickSlack("COSIMA SETUP: Multiple timing definitions. Exiting.",1);
             return 1;
         }
     }
@@ -754,8 +754,8 @@ int cosimaSetup(YAML::Node cosima, vector<string> &sources, vector<string> &geom
         regex e(".FileName.*\n");
         string updated = regex_replace(alteredSources[i],e,".FileName run"+to_string(i)+"\n");
 
+        // Update Triggers, Events, or Time
         if(!timing[0].empty()){
-            // Update Triggers, Events, or Time
             regex t("\\..?"+timing[0]+".*\n");
             updated = regex_replace(updated,t,"\."+timing[0]+" "+timing[1]+"\n");
         }
@@ -790,9 +790,7 @@ void runSimulation(const string source, const int threadNumber){
 
     // Create legend
     legendLock.lock();
-    legend << "Run number " << threadNumber << ":";
-    legend << "\nSource: " << source;
-    legend << "\nSeed:" << to_string(seed) << "\n" << endl;
+    legend << "Run number " << threadNumber << ":\nSource: " << source << "\nSeed:" << to_string(seed) << "\n" << endl;
     legendLock.unlock();
 
     // Get geometry file
@@ -827,8 +825,7 @@ void runSimulation(const string source, const int threadNumber){
         if(!keepAll) removeWildcard("run"+to_string(threadNumber)+".*.sim.gz");
     }else{
         // Dry run
-        cout << "bash -c \"source ${MEGALIB}/bin/source-megalib.sh; cosima -v "+to_string(cosimaVerbosity)+" -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz; exit $?\"\n";
-        cout << "bash -c \"source ${MEGALIB}/bin/source-megalib.sh; revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".*.sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz; exit $?\"\n";
+        cout << "bash -c \"source ${MEGALIB}/bin/source-megalib.sh; cosima -v "+to_string(cosimaVerbosity)+" -z -s "+to_string(seed)+" run"+to_string(threadNumber)+".source |& xz -3 > cosima.run"+to_string(threadNumber)+".log.xz; exit $?\"\nbash -c \"source ${MEGALIB}/bin/source-megalib.sh; revan -c "+revanSettings+" -n -a -f run"+to_string(threadNumber)+".*.sim.gz -g "+geoSetup+" |& xz -3 > revan.run"+to_string(threadNumber)+".log.xz; exit $?\"\n";
         if(!keepAll) cout << "rm run"+to_string(threadNumber)+".*.sim.gz\n";
     }
 
@@ -912,11 +909,10 @@ Or, manually:
 g++ checkGeometry.cpp -o checkGeometry -std=c++11 -pthread -lyaml-cpp -O2 -Wall $(root-config --cflags --glibs) -I$MEGALIB/include -L$MEGALIB/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc
 g++ autoMEGA.cpp -o autoMEGA -std=c++11 -pthread -lyaml-cpp -O2 -Wall
 ```
-
 */
 int main(int argc,char** argv){
     auto start = chrono::steady_clock::now();
-    for(int i=0;i<9;i++)statusBar[i]=0;
+    for(int i=0;i<9;i++) statusBar[i]=0;
 
     // Parse command line arguments
     for(int i=0;i<argc;i++){
@@ -926,7 +922,6 @@ int main(int argc,char** argv){
 
     // Make sure config file exists
     if(!fileExists(settings)){
-        cerr << "File \"" << settings << "\" does not exist, but was requested. Exiting."<< endl;
         quickSlack("MAIN: File \"" + settings + "\" does not exist, but was requested. Exiting.");
         return 1;
     }
@@ -963,14 +958,16 @@ int main(int argc,char** argv){
     thread statusThread(handleStatus);
 
     // Geomega stage
-    if(slackVerbosity>=3) quickSlack("Starting Geomega stage.");
+    quickSlack("Starting Geomega stage.",3);
     vector<string> geometries;
-    if(config["geomega"]) if(geomegaSetup(config["geomega"],geometries)!=0){
+    if(config["geomega"] && geomegaSetup(config["geomega"],geometries)!=0){
+        // Close threads
         exitFlag=1;
         watchdog0.join();
         statusThread.join();
         for(size_t i=0;i<threadpool.size();i++) threadpool[i].join();
         legend.close();
+
         // Enable echo
         tcgetattr(STDIN_FILENO, &tty);
         tty.c_lflag |= ECHO;
@@ -979,14 +976,16 @@ int main(int argc,char** argv){
     }
 
     // Cosima stage
-    if(slackVerbosity>=3) quickSlack("Starting Cosima parsing stage");
+    quickSlack("Starting Cosima parsing stage",3);
     vector<string> sources;
     if(config["cosima"]) if(cosimaSetup(config["cosima"],sources,geometries)!=0){
+        // Close threads
         exitFlag=1;
         watchdog0.join();
         statusThread.join();
         for(size_t i=0;i<threadpool.size();i++) threadpool[i].join();
         legend.close();
+
         // Enable echo
         tcgetattr(STDIN_FILENO, &tty);
         tty.c_lflag |= ECHO;
@@ -995,7 +994,7 @@ int main(int argc,char** argv){
     }
 
     // Calculate total number of simulations
-    if(slackVerbosity>=3) quickSlack("Starting all simulations");
+    quickSlack("Starting simulations",3);
 
     // Start all simulation threads.
     for(size_t i=0;i<sources.size();i++){
@@ -1012,12 +1011,13 @@ int main(int argc,char** argv){
     tty.c_lflag |= ECHO;
     (void) tcsetattr(STDIN_FILENO, TCSANOW, &tty);
 
-    // End timer, print command duration
+    // Close threads
     exitFlag=1;
     watchdog0.join();
     statusThread.join();
+
+    // End timer, print command duration
     auto end = chrono::steady_clock::now();
-    cout << endl << "Total simulation and analysis elapsed time: " << beautify_duration(chrono::duration_cast<chrono::seconds>(end-start)) << endl;
     quickSlack("Simulation complete. Elapsed time: "+beautify_duration(chrono::duration_cast<chrono::seconds>(end-start)));
     if(!address.empty()) email(address,"Simulation Complete. Elapsed time: "+beautify_duration(chrono::duration_cast<chrono::seconds>(end-start)));
     return 0;
