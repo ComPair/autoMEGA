@@ -348,6 +348,10 @@ void quickSlack(string message){
 vector<string> parseIterativeNode(YAML::Node contents, std::string prepend=""){
     vector<string> options; options.push_back(prepend);
     vector<string> newOptions;
+    if(contents.size()==0){
+        if(slackVerbosity>=1) quickSlack("Warning: PARSEITERATIVENODE: Empty iterative node set.");
+        cerr << "Warning: PARSEITERATIVENODE: Empty iterative node set." << endl;
+    }
     for(size_t i=0;i<contents.size();i++){
         // Parse options into vector of strings
         vector<string> parameters;
@@ -356,10 +360,15 @@ vector<string> parseIterativeNode(YAML::Node contents, std::string prepend=""){
             double step = contents[i][2].as<double>();
             for(double initial = contents[i][0].as<double>();initial<final;initial+=step) parameters.push_back(to_string(initial));
         } else if(contents[i].size()==1){
-            if(contents[i][0].size()==0) parameters.push_back("");
+            if(contents[i][0].size()==0){
+                parameters.push_back("");
+                if(slackVerbosity>=1) quickSlack("Warning: PARSEITERATIVENODE: Empty iterative node.");
+                cerr << "Warning: PARSEITERATIVENODE: Empty iterative node." << endl;
+            }
             for(size_t j=0;j<contents[i][0].size();j++) parameters.push_back(contents[i][0][j].as<string>());
         } else{
             quickSlack("PARSEITERATIVENODE: Malformed iterative node. Please see manual on correct format for iterative nodes. Exiting.");
+            cerr << "PARSEITERATIVENODE: Malformed iterative node. Please see manual on correct format for iterative nodes. Exiting." << endl;
             exitFlag=1;
             vector<string> empty; return empty;
         }
