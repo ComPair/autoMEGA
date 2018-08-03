@@ -1,14 +1,8 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
-#include <atomic>
-#include <mutex>
 #include <string>
 #include <vector>
-#include <regex>
-#include <thread>
-#include <ctime>
-#include <chrono>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <libgen.h>
@@ -57,9 +51,7 @@ public:
     /**
  @brief Set geometry filename
     */
-    bool SetGeometry(MString FileName, bool UpdateGui = true) {
-        return m_Data->SetCurrentFileName(FileName);
-    }
+    bool SetGeometry(MString FileName, bool UpdateGui = true) { return m_Data->SetCurrentFileName(FileName); }
 
     /**
  @brief Check geometry for overlaps
@@ -76,7 +68,6 @@ public:
         if(!ReadGeometry()) return 1;
 
         bool status = m_Geometry->CheckOverlaps();
-        cerr << "Root status: " << status << endl;
         if(!status) return 1;
 
         if(!MFile::Exists(g_MEGAlibPath + "/bin/cosima")) return 0;
@@ -87,7 +78,6 @@ public:
         ofstream out;
         out.open(FileName);
         if (!out.is_open()) return 0;
-
         out<<"Version 1\nGeometry "<<m_Data->GetCurrentFileName()<<"\nCheckForOverlaps 10000 0.0001\nPhysicsListEM Standard\nRun Minimum\nMinimum.FileName DelMe\nMinimum.NEvents 1\nMinimum.Source MinimumS\nMinimumS.ParticleType 1\nMinimumS.Position 1 1 0 0 \nMinimumS.SpectralType 1\nMinimumS.Energy 10\nMinimumS.Intensity 1\n";
         out.close();
 
@@ -97,7 +87,6 @@ public:
         gSystem->Exec(MString("rm -f DelMe.*.sim ") + FileName);
         long int size = getFileSize(outputFile);
         gSystem->ChangeDirectory(WorkingDirectory);
-        cerr << "Cosima size: " << size << endl;
         return size!=0;
     }
 
@@ -108,19 +97,14 @@ public:
 
 ## External cpp file to check geomega geometries without linking libraries or opening a GUI
 
-### Arguments
-All arguments are parsed as filenames to be checked
-
 ### Notes:
+All arguments are parsed as filenames to be checked, and the program returns the total number of invalid geometries
 Returns the total number of invalid geometries
 
 ### To build:
 ```
-git submodule update --init --recursive --remote
-# Follow instructions to precompile pipeliningTools
-g++ checkGeometry.cpp -std=c++11 -lX11 -lXtst -pthread -ldl -ldw -lyaml-cpp -g -lcurl -Ofast -Wall -o checkGeometry $(root-config --cflags --libs) -I$MEGALIB/include -L$MEGALIB/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc
+g++ checkGeometry.cpp -o checkGeometry -std=c++11 -pthread -O2 -Wall $(root-config --cflags --libs) -I$MEGALIB/include -L$MEGALIB/lib -lGeomegaGui -lGeomega -lCommonGui -lCommonMisc
 ```
-
 */
 int main(int argc,char** argv){
     int overall = 0;
@@ -139,7 +123,6 @@ int main(int argc,char** argv){
         bool good = geomega.TestIntersections(string(argv[i])+".out");
         overall +=good;
     }
-
 
     return overall;
 }
